@@ -109,21 +109,21 @@ const linspace = (a: number, b: number, n: number) =>
   Array.from({ length: n }, (_, i) => a + ((b - a) * i) / (n - 1));
 
 // 生命線の弧：v(手首方向)が進むほど親指側(負u)へ膨らみ、また戻る。
-// 手の輪郭（外側の強い境界）へ吸着しないよう、中央寄り＆控えめな膨らみにする。
+// 手の輪郭へ吸着しないよう中央寄り＆控えめな膨らみに（さらに内側へ調整）。
 const lifeArc = (v: number) => {
   const t = Math.max(0, Math.min(1, (v - 0.42) / (0.96 - 0.42)));
-  return -0.14 - 0.16 * Math.sin(Math.PI * t); // -0.14 〜 -0.30（中央寄り）
+  return -0.1 - 0.12 * Math.sin(Math.PI * t); // -0.10 〜 -0.22（中央寄り）
 };
 
 const CFG: Record<BaseLine, TraceCfg> = {
   // 感情線：付け根のすぐ下を 小指側→人差し指側 へ横断（u に沿い v を探索）
   heart_line: { along: linspace(1.25, 0.05, 14), searchAxis: "v", range: [0.04, 0.32], steps: 26, expected: () => 0.16, sigma: 0.06 },
-  // 知能線：中央を横断（感情線より下）
-  head_line: { along: linspace(-0.25, 1.05, 14), searchAxis: "v", range: [0.22, 0.6], steps: 26, expected: () => 0.4, sigma: 0.09 },
+  // 知能線：中央を横断（感情線より下）。少し上(指側)へ寄せる。
+  head_line: { along: linspace(-0.25, 1.05, 14), searchAxis: "v", range: [0.16, 0.5], steps: 26, expected: () => 0.33, sigma: 0.09 },
   // 運命線：中央を縦に（v に沿い u を探索）
   fate_line: { along: linspace(0.95, 0.18, 14), searchAxis: "u", range: [0.28, 0.64], steps: 26, expected: () => 0.47, sigma: 0.1 },
-  // 生命線：親指側の弧（v に沿い u を負側で探索）。範囲を内側に制限し輪郭への吸着を防ぐ。
-  life_line: { along: linspace(0.42, 0.96, 16), searchAxis: "u", range: [-0.44, 0.06], steps: 30, expected: lifeArc, sigma: 0.12 },
+  // 生命線：親指側の弧（v に沿い u を負側で探索）。範囲を内側に制限し輪郭吸着を防止＆中央寄りに。
+  life_line: { along: linspace(0.42, 0.96, 16), searchAxis: "u", range: [-0.36, 0.08], steps: 28, expected: lifeArc, sigma: 0.12 },
 };
 
 function traceLine(
