@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>掌相 — 手相診断プロトタイプ</title>
+<style>
+  :root{
+    --ink:#0b1026; --ink2:#141a3a; --panel:#1b2247; --line:#2a3361;
+    --gold:#d9b36b; --gold-soft:#e7cf9e; --text:#e9ecf7; --muted:#9aa2c8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 600px at 70% -10%, #20275499 0%, transparent 60%),
+      radial-gradient(900px 500px at 0% 110%, #2a1f4799 0%, transparent 55%),
+      var(--ink);
+    color:var(--text);min-height:100vh;line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:30px 20px 90px}
+
+  header.top{text-align:center;margin-bottom:8px}
+  .brand{font-size:34px;font-weight:700;letter-spacing:.16em;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand small{display:block;font-size:11px;letter-spacing:.36em;color:var(--muted);font-weight:400;margin-top:4px}
+  .tagline{color:var(--muted);font-size:13px;margin-top:8px}
+  .proto-badge{display:inline-block;margin-top:12px;font-size:10.5px;letter-spacing:.2em;
+    color:var(--gold);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+
+  .dots{display:flex;justify-content:center;gap:10px;margin:24px 0}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.3s}
+  .dot.on{background:var(--gold);width:22px;border-radius:4px}
+
+  .card{background:linear-gradient(180deg,var(--panel),var(--ink2));
+    border:1px solid var(--line);border-radius:22px;padding:28px 26px}
+  .card h2{font-size:17px;letter-spacing:.04em;margin-bottom:4px;text-align:center}
+  .card .sub{color:var(--muted);font-size:13px;text-align:center;margin-bottom:22px}
+
+  .opts{display:flex;flex-direction:column;gap:10px;max-width:380px;margin:0 auto}
+  .opt{display:flex;align-items:center;gap:14px;background:#0e1330;border:1px solid var(--line);
+    border-radius:14px;padding:14px 16px;cursor:pointer;transition:all .15s;text-align:left;
+    color:var(--text);font-family:inherit;font-size:14px;width:100%}
+  .opt:hover{border-color:var(--gold)}
+  .opt[aria-pressed="true"]{border-color:var(--gold);background:linear-gradient(180deg,#2c2f57,#222647)}
+  .opt .ic{width:40px;height:40px;border-radius:10px;background:#1a2046;display:grid;place-items:center;flex:none}
+  .opt .ic svg{width:24px;height:24px}
+  .opt .tx b{display:block;font-size:14px;margin-bottom:1px}
+  .opt .tx span{color:var(--muted);font-size:12px}
+  .opt[aria-pressed="true"] .ic{background:linear-gradient(180deg,var(--gold-soft),var(--gold))}
+  .opt[aria-pressed="true"] .ic svg *{stroke:var(--ink)}
+
+  .nav{display:flex;gap:12px;margin-top:26px;max-width:380px;margin-left:auto;margin-right:auto}
+  .btn{flex:1;padding:14px;border-radius:13px;border:none;cursor:pointer;font-size:14.5px;
+    font-weight:700;font-family:inherit;letter-spacing:.04em;transition:transform .1s,filter .15s}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(180deg,var(--gold-soft),var(--gold));color:var(--ink)}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);flex:0 0 auto;padding:14px 20px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  .scan{max-width:300px;margin:0 auto;text-align:center}
+  .scan-frame{position:relative;width:300px;height:330px;margin:0 auto;border-radius:18px;
+    background:radial-gradient(circle at 50% 40%, #1a2148, #0c1130);overflow:hidden;border:1px solid var(--line)}
+  .corner{position:absolute;width:26px;height:26px;border:2px solid var(--gold)}
+  .corner.tl{top:14px;left:14px;border-right:0;border-bottom:0;border-radius:6px 0 0 0}
+  .corner.tr{top:14px;right:14px;border-left:0;border-bottom:0;border-radius:0 6px 0 0}
+  .corner.bl{bottom:14px;left:14px;border-right:0;border-top:0;border-radius:0 0 0 6px}
+  .corner.br{bottom:14px;right:14px;border-left:0;border-top:0;border-radius:0 0 6px 0}
+  .scanline{position:absolute;left:8%;right:8%;height:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+    top:0;opacity:0;filter:drop-shadow(0 0 6px var(--gold))}
+  .scanning .scanline{animation:scan 1.6s ease-in-out infinite;opacity:1}
+  @keyframes scan{0%{top:12%}50%{top:86%}100%{top:12%}}
+  .scan-hint{color:var(--muted);font-size:12.5px;margin-top:16px;min-height:20px}
+  #handSvg .palmpath{transition:stroke-width .4s,opacity .4s}
+
+  .result-head{text-align:center;padding:6px 0 22px}
+  .result-head .axis{font-size:11px;letter-spacing:.24em;color:var(--gold)}
+  .result-head h2{font-size:23px;margin:8px 0;font-weight:700}
+  .result-head p{color:var(--muted);font-size:13px;max-width:520px;margin:0 auto}
+  .rgrid{display:flex;flex-direction:column;gap:12px}
+
+  /* 結果：写真＋線オーバーレイ */
+  .photo-wrap{position:relative;width:300px;max-width:100%;margin:0 auto 8px;border-radius:18px;
+    overflow:hidden;border:1px solid var(--line);background:radial-gradient(circle at 50% 40%,#1a2148,#0c1130)}
+  .photo-wrap svg{width:100%;height:auto;display:block}
+  .photo-svg .pline{cursor:pointer;transition:stroke-width .2s,opacity .2s,filter .2s;
+    stroke-width:3;opacity:.85}
+  .photo-svg .pline:hover{opacity:1}
+  .photo-svg .pline.sel{stroke-width:5;opacity:1;filter:drop-shadow(0 0 5px currentColor)}
+  .photo-svg .pline.dim{opacity:.28}
+  .photo-hint{text-align:center;color:var(--muted);font-size:12px;margin:0 0 16px}
+  /* 線を選ぶチップ */
+  .linechips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:18px}
+  .lchip{display:flex;align-items:center;gap:7px;background:#0e1330;border:1px solid var(--line);
+    color:var(--text);border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;
+    font-family:inherit;transition:all .15s}
+  .lchip:hover{border-color:var(--gold)}
+  .lchip .cdot{width:9px;height:9px;border-radius:50%;flex:none}
+  .lchip[aria-pressed="true"]{border-color:var(--gold);background:#1a2046;font-weight:700}
+  .lchip.extra{border-style:dashed}
+  .rcard{background:#141a38;border:1px solid var(--line);border-left-width:3px;
+    border-radius:14px;padding:15px 18px;opacity:0;transform:translateY(10px);animation:rise .5s ease forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .rcard h4{font-size:15px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .rcard h4 .sw{width:16px;height:3px;border-radius:2px}
+  .rcard h4 .pill{font-size:10.5px;color:var(--muted);font-weight:500;border:1px solid var(--line);
+    padding:2px 9px;border-radius:999px;margin-left:auto;letter-spacing:.06em}
+  .rcard ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+  .rcard li{font-size:13.5px;color:#dfe3f4;padding-left:18px;position:relative}
+  .rcard li::before{content:"";position:absolute;left:2px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--gold)}
+  .rcard.absent li::before{background:var(--muted)}
+  .rcard.static{opacity:1;transform:none;animation:none}
+  .rcard .when{margin-top:9px;font-size:12.5px;color:var(--gold-soft);border-top:1px dashed var(--line);padding-top:9px}
+  .rcard .deepread{font-size:14px;color:#fff;background:#ffffff0a;border-radius:10px;
+    padding:11px 13px;margin-bottom:11px;line-height:1.65;font-weight:600}
+  .rcard .advice{margin-top:11px;font-size:12.8px;color:#dfe3f4;background:#2a2440;
+    border:1px solid #43395f;border-radius:10px;padding:11px 13px;line-height:1.7}
+  .rcard .advice .atag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--gold-soft);
+    border:1px solid var(--line);border-radius:999px;padding:1px 9px;margin-right:8px;letter-spacing:.06em}
+  .summary{background:linear-gradient(180deg,#23284e,#191e40);border:1px solid var(--line);
+    border-radius:16px;padding:18px 20px;margin-bottom:16px}
+  .summary h3{font-size:13px;letter-spacing:.12em;color:var(--gold-soft);margin-bottom:6px}
+  .summary p{font-size:14px;color:#eaedfa}
+  .disc{margin-top:22px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.9}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">掌相<small>PALM READING</small></div>
+    <div class="tagline">手のひらに、これからのヒントを。</div>
+    <div class="proto-badge">PROTOTYPE</div>
+  </header>
+
+  <div class="dots"><div class="dot on" id="d0"></div><div class="dot" id="d1"></div><div class="dot" id="d2"></div><div class="dot" id="d3"></div></div>
+
+  <!-- STEP 0: 利き手 -->
+  <section class="card" id="screen0">
+    <h2>あなたの利き手は？</h2>
+    <p class="sub">利き手を「いまのあなた」、反対の手を「生まれ持った本質」として読み解きます。</p>
+    <div class="opts" id="handednessOpts">
+      <button class="opt" data-v="right" aria-pressed="true">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M8 13V5a1.5 1.5 0 013 0v6m0-1a1.5 1.5 0 013 0v1m0 0a1.5 1.5 0 013 0v4a6 6 0 01-6 6h-1.5a5 5 0 01-4.2-2.3L6 18c-1-1.5.8-3 2-1.8l1 1" stroke="#9aa2c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="tx"><b>右利き</b><span>右手で字を書く・箸を持つ</span></span>
+      </button>
+      <button class="opt" data-v="left" aria-pressed="false">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M16 13V5a1.5 1.5 0 00-3 0v6m0-1a1.5 1.5 0 00-3 0v1m0 0a1.5 1.5 0 00-3 0v4a6 6 0 006 6h1.5a5 5 0 004.2-2.3L18 18c1-1.5-.8-3-2-1.8l-1 1" stroke="#9aa2c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="tx"><b>左利き</b><span>左手で字を書く・箸を持つ</span></span>
+      </button>
+    </div>
+    <div class="nav"><button class="btn primary" onclick="go(1)">次へ</button></div>
+  </section>
+
+  <!-- STEP 1: 撮影モード -->
+  <section class="card hidden" id="screen1">
+    <h2>どの手を占いますか？</h2>
+    <p class="sub">片手だけでも占えます。両手だと「生まれ持った自分」と「いまの自分」の違いも読めます。</p>
+    <div class="opts" id="modeOpts">
+      <button class="opt" data-v="right" aria-pressed="true">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="3" stroke="#9aa2c8" stroke-width="1.6"/><path d="M12 7v6" stroke="#9aa2c8" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        <span class="tx"><b>右手</b><span>いまの自分・これからを見る（手軽）</span></span>
+      </button>
+      <button class="opt" data-v="left" aria-pressed="false">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="3" stroke="#9aa2c8" stroke-width="1.6"/><path d="M9 7h6" stroke="#9aa2c8" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        <span class="tx"><b>左手</b><span>生まれ持った本質・素質を見る</span></span>
+      </button>
+      <button class="opt" data-v="both" aria-pressed="false">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="9" height="16" rx="2.5" stroke="#9aa2c8" stroke-width="1.6"/><rect x="13" y="4" width="9" height="16" rx="2.5" stroke="#9aa2c8" stroke-width="1.6"/></svg></span>
+        <span class="tx"><b>両手</b><span>本式・右手と左手を1枚ずつ撮影</span></span>
+      </button>
+    </div>
+    <div class="nav">
+      <button class="btn ghost" onclick="go(0)">戻る</button>
+      <button class="btn primary" onclick="go(2)">撮影へ進む</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: 撮影 -->
+  <section class="card hidden" id="screen2">
+    <h2 id="scanTitle">手のひらを撮影</h2>
+    <p class="sub" id="scanSub">枠の中に手のひらを収めて、撮影ボタンを押してください。</p>
+    <div class="scan">
+      <div class="scan-frame" id="scanFrame">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <span class="scanline"></span>
+        <svg id="handSvg" viewBox="0 0 300 360" style="width:100%;height:100%">
+          <g id="gFlip">
+            <path d="M 112 352 C 104 322 100 300 100 280 C 82 286 60 286 46 276 C 34 267 34 254 46 250 C 58 246 74 250 88 256 C 72 244 56 230 50 216 C 46 206 56 198 66 206 C 78 216 90 232 98 244 C 86 220 74 188 70 168 C 67 154 80 150 86 164 C 94 184 100 210 106 228 C 102 196 96 150 96 120 C 96 105 110 105 113 120 C 117 148 116 192 118 222 L 122 222 C 122 186 124 132 130 110 C 133 96 147 96 149 112 C 151 142 144 190 142 224 L 147 224 C 152 190 162 144 170 124 C 175 110 189 113 187 130 C 184 160 172 198 162 226 C 172 206 186 180 198 168 C 207 159 219 166 213 180 C 205 200 188 232 176 256 C 188 264 196 276 198 292 C 200 312 196 334 190 352 Z"
+                  fill="#141a3e" stroke="#46517f" stroke-width="2.2" stroke-linejoin="round"/>
+            <g id="guideLines" stroke="#e8607a" stroke-width="2.4" fill="none" stroke-dasharray="6 6" stroke-linecap="round" opacity="1" style="transition:opacity .4s">
+              <path d="M 108 238 C 88 250 78 282 80 308 C 82 330 90 346 102 350"/>
+              <path d="M 110 244 C 134 254 162 262 184 274"/>
+              <path d="M 196 250 C 168 236 130 232 106 242"/>
+              <path d="M 150 350 C 148 300 146 262 142 230"/>
+            </g>
+            <g id="realLines">
+              <path id="ln_life"     class="palmpath" d="M 108 238 C 88 250 78 282 80 308 C 82 330 90 346 102 350" fill="none" stroke="#d9b36b" stroke-width="0" stroke-linecap="round"/>
+              <path id="ln_head"     class="palmpath" d="M 110 244 C 134 254 162 262 184 274" fill="none" stroke="#8ab4d9" stroke-width="0" stroke-linecap="round"/>
+              <path id="ln_heart"    class="palmpath" d="M 196 250 C 168 236 130 232 106 242" fill="none" stroke="#c98a8a" stroke-width="0" stroke-linecap="round"/>
+              <path id="ln_fate"     class="palmpath" d="M 150 350 C 148 300 146 262 142 230" fill="none" stroke="#9a86c9" stroke-width="0" stroke-linecap="round"/>
+              <path id="ln_sun"      class="palmpath" d="M 168 256 C 166 234 165 216 164 198" fill="none" stroke="#e0c060" stroke-width="0" stroke-linecap="round"/>
+              <path id="ln_money"    class="palmpath" d="M 188 250 C 188 232 188 216 188 202" fill="none" stroke="#7fbf9a" stroke-width="0" stroke-linecap="round"/>
+              <path id="ln_marriage" class="palmpath" d="M 198 232 L 214 228" fill="none" stroke="#cf9ec0" stroke-width="0" stroke-linecap="round"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <div class="scan-hint" id="scanHint">右手をかざしてください</div>
+    </div>
+    <div class="nav">
+      <button class="btn ghost" onclick="go(1)">戻る</button>
+      <button class="btn primary" id="captureBtn" onclick="capture()">撮影して占う</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: 結果 -->
+  <section class="card hidden" id="screen3">
+    <div id="resultBody"></div>
+    <div class="nav" style="max-width:380px">
+      <button class="btn ghost" onclick="restart()">最初から</button>
+      <button class="btn primary" onclick="recapture()">もう一度占う</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const RULES={lines:{
+  life_line:{nm:"生命線",theme:"生命力・健康",color:"#d9b36b",group:"base",feats:["length","curve","depth"],
+    rules:{length:{long:"安定したエネルギーを持続でき、長期目標にコツコツ取り組むタイプ。",short:"環境変化に敏感で、人生の途中で大きく方向転換しやすいタイプ。"},
+      curve:{deep:"体力とバイタリティに溢れ、行動的で活動的な生活を好む。",shallow:"体力より知力で勝負するタイプ。頭脳を活かす生活が合う。"},
+      depth:{dark:"生命力・体力が強く、心身がタフ。",faint:"繊細で協調性・柔軟性が高い。体調管理を意識するとよい。"}},
+    combos:[
+      {when:{length:"long",depth:"dark"},text:"濃くて長い生命線は、心身ともにスタミナが豊富なしるし。多少の無理も乗り越えられる頑健さがあります。"},
+      {when:{length:"long",curve:"deep"},text:"長く大きく張り出した生命線は、行動力と持久力を兼ね備えた相。やりたいことに全力で打ち込めるタイプです。"},
+      {when:{depth:"faint",curve:"shallow"},text:"細く控えめな生命線は、繊細でエネルギーの配分が上手なタイプ。頑張りすぎず自分のペースを保つほど力を発揮します。"},
+      {when:{length:"short",depth:"dark"},text:"短くても濃い生命線は、一点集中型のエネルギー。決めた時期にぐっと力を注げる瞬発力があります。"}
+    ],
+    advice:{
+      faint:"疲れをため込みやすいので、休息と睡眠を意識的に。無理を続けないことが運気の安定につながります。",
+      short:"環境の変わり目が転機になりやすい時期。体調の変化にも目を向けて、こまめにメンテナンスを。"
+    }},
+  head_line:{nm:"知能線",theme:"思考タイプ・才能",color:"#8ab4d9",group:"base",feats:["slope","length"],
+    rules:{slope:{downward:"ロマンティストで創造的。芸術・クリエイティブ方面に強い。",straight:"現実的・論理的な思考タイプ。理系・ビジネス適性が高い。"},
+      length:{long:"じっくり考え計画的に行動する熟考タイプ。",short:"直観力に優れ、瞬時に状況を把握してテキパキ動く。"}},
+    combos:[
+      {when:{slope:"downward",length:"long"},text:"長く下へ伸びる知能線は、想像力が豊かで物事を深く掘り下げるタイプ。発想力を活かせる場で輝きます。"},
+      {when:{slope:"straight",length:"long"},text:"まっすぐ長い知能線は、論理的で計画性が高い相。筋道を立てて考え、着実に成果を出せます。"},
+      {when:{slope:"straight",length:"short"},text:"短くまっすぐな知能線は、決断が速く実行力に富むタイプ。考えるより動くほうが結果につながります。"}
+    ],
+    advice:{
+      downward:"考えすぎて立ち止まりやすい一面も。直感を信じて一歩踏み出すと、視界がひらけます。",
+      short:"スピード感が魅力ですが、大事な決断はひと呼吸おくと、より後悔のない選択ができます。"
+    }},
+  heart_line:{nm:"感情線",theme:"感情・愛情",color:"#c98a8a",group:"base",feats:["length","start_height","depth"],
+    rules:{length:{long:"愛情深く面倒見がよい。情が厚く、独占欲もやや強め。",short:"淡白で冷静。あっさりした人付き合いを好む。"},
+      start_height:{high:"感情を素直に表現できる情熱的なタイプ。",low:"クールで理性的。感情をコントロールできる。"},
+      depth:{dark:"愛情表現が豊かで情熱的。芯が強い。",faint:"繊細で控えめ。感情表現は穏やか。"}},
+    combos:[
+      {when:{length:"long",depth:"dark"},text:"長く濃い感情線は、愛情深く情熱的な相。大切な人にまっすぐ尽くせる一方、思い入れが強くなりすぎることも。"},
+      {when:{length:"short",start_height:"low"},text:"短く低い位置の感情線は、感情に流されず物事を見られる冷静なタイプ。落ち着いた人間関係を築けます。"},
+      {when:{depth:"faint",start_height:"high"},text:"繊細でありながら素直な感情線。気持ちは豊かでも表現は控えめなので、言葉にして伝えると関係が深まります。"}
+    ],
+    advice:{
+      long:"情が深いぶん、相手への期待が大きくなりがち。少し力を抜いて向き合うと、人間関係がより心地よくなります。",
+      dark:"感情がまっすぐ伝わる魅力がある一方、ヒートアップしやすい面も。大事な場面ではひと呼吸おくと吉。"
+    }},
+  fate_line:{nm:"運命線",theme:"仕事運・人生の流れ",color:"#9a86c9",group:"base",feats:["presence","length","depth"],
+    rules:{presence:{absent:"その時々で柔軟に生きる自由なタイプ。"},
+      length:{long:"責任感が強く責務を全うできる。リーダー資質があり出世しやすい。"},
+      depth:{dark:"意志が強くポリシーを持つ。頼られやすいが抱え込みに注意。",faint:"自由で変化に富んだ生き方を示す。"}},
+    combos:[
+      {when:{length:"long",depth:"dark"},text:"長く濃い運命線は、芯の強さと責任感を備えた相。周囲から頼られ、人生を自分の手で切り拓いていけます。"},
+      {when:{depth:"faint"},text:"うすめの運命線は、決まった型にとらわれず柔軟に進めるしるし。変化を楽しめる人ほど道がひらけます。"}
+    ],
+    advice:{
+      dark:"頼られて何でも背負い込みやすいタイプ。たまには人に任せると、長く力を発揮できます。",
+      long:"責任感が強いぶん、休むのが苦手かも。意識して肩の力を抜く時間をつくると、運気がめぐります。"
+    }},
+  sun_line:{nm:"太陽線",theme:"成功・人気・金運",color:"#e0c060",group:"extra",feats:["presence","length","depth","count"],
+    rules:{presence:{present:"成功・人気・金運に恵まれる吉相。人を惹きつける魅力を持つ。",absent:"自立タイプ。自分の力で成功や幸せを掴む。謙虚で誠実な人が多い。"},
+      length:{long:"成功や人気を得る期間が長く続く。お金にも苦労しにくい。",short:"大器晩成の相。今は控えめでも晩年に成功が花開く。"},
+      depth:{dark:"金運が上昇中。お金に困りにくい好調な状態。",faint:"そこそこ成功しているが、収入はやや不安定かも。"},
+      count:{multiple:"本業以外の副業でも稼げる多角経営タイプ。"}}},
+  money_line:{nm:"財運線",theme:"金運・蓄財力",color:"#7fbf9a",group:"extra",feats:["presence","depth","count"],
+    rules:{presence:{present:"金運・商売運に恵まれる。あるだけでラッキーな線。",absent:"お金への執着が薄いタイプ。収入よりやりがいを優先する生き方。"},
+      depth:{dark:"お金を貯めたり財産を築くのが上手。お金の巡りがスムーズ。"},
+      count:{multiple:"収入源は複数あるが浪費傾向。入っても手元に残りにくい。"}}},
+  marriage_line:{nm:"結婚線",theme:"結婚・出会いの時期",color:"#cf9ec0",group:"extra",feats:["presence","length","depth","direction","count"],
+    rules:{presence:{absent:"今は結婚への関心が薄い状態。気持ちが変われば線が現れる。"},
+      length:{long:"結婚生活が安定し満足度が高い。理想やこだわりが強く、慎重に相手を選ぶ。",short:"直感的に結婚を決めるタイプ。こだわりが少なくスピード婚も。"},
+      depth:{dark:"結婚への意識が強く縁が深い。結婚の可能性が高い。",faint:"結婚願望が薄め、または縁が薄い。仕事中心の傾向。"},
+      direction:{upward:"結婚で運が開ける。相性の良い相手に恵まれる吉相。",downward:"妥協しないよう意識すると良い時期（変化しうるので前向きに）。"},
+      count:{single:"運命的な大恋愛の末に結婚する可能性。理想の相手と結ばれる強い運。",multiple:"結婚につながる出会いのチャンスが複数。"}}}
+}};
+const FEAT_OPTS={length:["long","standard","short"],curve:["deep","standard","shallow"],
+  depth:["dark","standard","faint"],slope:["downward","straight","upward"],
+  start_height:["high","standard","low"],presence:["present","absent"],
+  count:["single","multiple"],direction:["upward","straight","downward"]};
+const LINE_ORDER=["life_line","head_line","heart_line","fate_line","sun_line","money_line","marriage_line"];
+const SVG_ID={life_line:"ln_life",head_line:"ln_head",heart_line:"ln_heart",fate_line:"ln_fate",sun_line:"ln_sun",money_line:"ln_money",marriage_line:"ln_marriage"};
+
+const state={handedness:"right",mode:"right",reading:null,
+  scanQueue:[],   // これから撮る手の配列 例:["right","left"]
+  scanIdx:0,       // 現在何枚目か
+  captured:[]      // 撮影済み {hand,f}
+};
+
+function wireOpts(boxId,key){
+  const box=document.getElementById(boxId);
+  box.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+    box.querySelectorAll(".opt").forEach(o=>o.setAttribute("aria-pressed",o===b));
+    state[key]=b.dataset.v;
+  });
+}
+wireOpts("handednessOpts","handedness");
+wireOpts("modeOpts","mode");
+
+function go(n){
+  for(let i=0;i<4;i++){
+    document.getElementById("screen"+i).classList.toggle("hidden",i!==n);
+    document.getElementById("d"+i).classList.toggle("on",i<=n);
+  }
+  if(n===2){initScanQueue();prepScan();}
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+// 撮影キューを準備。両手は右→左の2枚、片手は1枚。
+function initScanQueue(){
+  state.scanQueue = state.mode==="both" ? ["right","left"] : [state.mode];
+  state.scanIdx=0;
+  state.captured=[];
+}
+function prepScan(){
+  const hand=state.scanQueue[state.scanIdx];      // 今撮る手
+  const hd=hand==="right"?"右手":"左手";
+  const total=state.scanQueue.length;
+  const stepLabel=total>1?`（${state.scanIdx+1}/${total}）`:"";
+  document.getElementById("scanTitle").textContent=hd+"のひらを撮影"+stepLabel;
+  document.getElementById("scanHint").textContent=hd+"をかざしてください";
+  const isFirst=state.scanIdx===0;
+  document.getElementById("scanSub").textContent= total>1
+    ? `${isFirst?"まず":"続いて"}${hd}を。枠の中に${hd}のひらを収めて、撮影ボタンを押してください。`
+    : `枠の中に${hd}のひらを収めて、撮影ボタンを押してください。`;
+  // 左手のときは鏡像反転
+  const flip=(hand==="left");
+  document.getElementById("gFlip").setAttribute("transform",flip?"translate(300,0) scale(-1,1)":"");
+  document.getElementById("guideLines").style.opacity=1;
+  LINE_ORDER.forEach(l=>document.getElementById(SVG_ID[l]).style.strokeWidth=0);
+  document.getElementById("scanFrame").classList.remove("scanning");
+  document.getElementById("captureBtn").disabled=false;
+  document.getElementById("captureBtn").textContent="撮影して占う";
+}
+
+function genFeatures(){
+  const f={};
+  LINE_ORDER.forEach(l=>{
+    const L=RULES.lines[l];f[l]={};
+    if(L.group==="extra"){
+      if(Math.random()<0.45){f[l]={presence:"absent"};return;}
+      if(L.feats.includes("presence"))f[l].presence="present";
+    }
+    L.feats.forEach(ft=>{
+      if(ft==="presence")return;
+      if(Math.random()<0.7){const opts=FEAT_OPTS[ft];f[l][ft]=opts[Math.floor(Math.random()*opts.length)];}
+    });
+  });
+  return f;
+}
+
+function capture(){
+  const btn=document.getElementById("captureBtn");
+  btn.disabled=true;btn.textContent="読み取り中…";
+  document.getElementById("scanFrame").classList.add("scanning");
+  document.getElementById("scanHint").textContent="手相を読み取っています…";
+  document.getElementById("guideLines").style.opacity=0;
+  LINE_ORDER.forEach((l,i)=>setTimeout(()=>{document.getElementById(SVG_ID[l]).style.strokeWidth=3;},400+i*220));
+  setTimeout(()=>{
+    // 今撮った手の結果を蓄積
+    const hand=state.scanQueue[state.scanIdx];
+    state.captured.push({hand,f:genFeatures()});
+    if(state.scanIdx < state.scanQueue.length-1){
+      // まだ撮る手が残っている → 次の手の撮影へ
+      state.scanIdx++;
+      prepScan();
+      const nextHd=state.scanQueue[state.scanIdx]==="right"?"右手":"左手";
+      document.getElementById("scanHint").textContent="次は"+nextHd+"です";
+    }else{
+      // 全部撮り終えた → 結果へ
+      state.reading=state.captured;
+      renderResult();
+      go(3);
+    }
+  },2600);
+}
+function primaryHand(){if(state.mode!=="both")return state.mode;return state.handedness;}
+function axisFor(hand){return hand===state.handedness?"後天運 ・ いまのあなた":"先天運 ・ 生まれ持った本質";}
+
+// 各線のSVGパス（撮影画面と同じ座標系 viewBox 0 0 300 360）
+const LINE_PATH={
+  life_line:"M 108 238 C 88 250 78 282 80 308 C 82 330 90 346 102 350",
+  head_line:"M 110 244 C 134 254 162 262 184 274",
+  heart_line:"M 196 250 C 168 236 130 232 106 242",
+  fate_line:"M 150 350 C 148 300 146 262 142 230",
+  sun_line:"M 168 256 C 166 234 165 216 164 198",
+  money_line:"M 188 250 C 188 232 188 216 188 202",
+  marriage_line:"M 198 232 L 214 228"
+};
+// 手のひら輪郭パス（撮影画面と共通）
+const PALM_PATH="M 112 352 C 104 322 100 300 100 280 C 82 286 60 286 46 276 C 34 267 34 254 46 250 C 58 246 74 250 88 256 C 72 244 56 230 50 216 C 46 206 56 198 66 206 C 78 216 90 232 98 244 C 86 220 74 188 70 168 C 67 154 80 150 86 164 C 94 184 100 210 106 228 C 102 196 96 150 96 120 C 96 105 110 105 113 120 C 117 148 116 192 118 222 L 122 222 C 122 186 124 132 130 110 C 133 96 147 96 149 112 C 151 142 144 190 142 224 L 147 224 C 152 190 162 144 170 124 C 175 110 189 113 187 130 C 184 160 172 198 162 226 C 172 206 186 180 198 168 C 207 159 219 166 213 180 C 205 200 188 232 176 256 C 188 264 196 276 198 292 C 200 312 196 334 190 352 Z";
+
+let resultDiag=[], resultSelected=null;
+
+function renderResult(){
+  const main=primaryHand();
+  const mainHand=state.reading.find(h=>h.hand===main)||state.reading[0];
+  resultDiag=diagnoseHand(mainHand.f).filter(r=>!r.absent); // 検出できた(=ある)線だけ
+  resultSelected=resultDiag.length?resultDiag[0].line:null;
+
+  const flip=(mainHand.hand==="left");
+  let html=`<div class="result-head">
+    <div class="axis">${axisFor(mainHand.hand)}</div>
+    <h2>あなたの手相診断</h2>
+    <p>あなたの手から<b>${resultDiag.length}本</b>の手相を読み取りました。線をタップすると解説が見られます。</p>
+  </div>`;
+
+  // 写真（プロトタイプでは手のひらSVGを写真に見立てる）＋検出線オーバーレイ
+  html+=`<div class="photo-wrap"><svg class="photo-svg" viewBox="0 0 300 360">
+    <g transform="${flip?'translate(300,0) scale(-1,1)':''}">
+      <path d="${PALM_PATH}" fill="#0e1330" stroke="#3a4576" stroke-width="2" opacity=".9"/>
+      ${resultDiag.map(r=>`<path class="pline" data-line="${r.line}" d="${LINE_PATH[r.line]}"
+        fill="none" stroke="${r.L.color}" stroke-linecap="round"/>`).join("")}
+    </g>
+  </svg></div>
+  <p class="photo-hint">※ プロトタイプのため、検出イメージを図で表示しています</p>`;
+
+  // 線を選ぶチップ
+  html+=`<div class="linechips">${resultDiag.map(r=>
+    `<button class="lchip ${r.L.group==='extra'?'extra':''}" data-line="${r.line}">
+      <span class="cdot" style="background:${r.L.color}"></span>${r.L.nm}</button>`).join("")}</div>`;
+
+  // 選択中の線の解説カード
+  html+=`<div id="lineDetail"></div>`;
+
+  // 総合
+  html+=`<div class="summary" style="margin-top:6px"><h3>総合</h3><p>${overall(resultDiag)}</p></div>`;
+  if(state.mode==="both"){
+    html+=`<div class="summary" style="margin-top:12px"><h3>左右のちがい</h3><p>${diffText()}</p></div>`;
+  }
+  html+=`<div class="disc">これは手相学にもとづく娯楽目的の診断です。寿命・健康・結婚などを断定するものではありません。<br>採用した見方：利き手（${state.handedness==="right"?"右":"左"}利き）／${({right:"右手",left:"左手",both:"両手"})[state.mode]}</div>`;
+  document.getElementById("resultBody").innerHTML=html;
+
+  // イベント結線：写真の線・チップどちらをタップしても選択
+  document.querySelectorAll(".photo-svg .pline").forEach(p=>p.onclick=()=>selectLine(p.dataset.line));
+  document.querySelectorAll(".lchip").forEach(c=>c.onclick=()=>selectLine(c.dataset.line));
+  selectLine(resultSelected);
+}
+
+function selectLine(line){
+  resultSelected=line;
+  // 写真上のハイライト
+  document.querySelectorAll(".photo-svg .pline").forEach(p=>{
+    p.classList.toggle("sel",p.dataset.line===line);
+    p.classList.toggle("dim",line&&p.dataset.line!==line);
+  });
+  // チップ
+  document.querySelectorAll(".lchip").forEach(c=>c.setAttribute("aria-pressed",c.dataset.line===line));
+  // 解説カード
+  const box=document.getElementById("lineDetail");
+  if(!line){box.innerHTML="";return;}
+  const r=resultDiag.find(x=>x.line===line);
+  const combo=comboFor(r.L,r.feats||{});
+  const advice=adviceFor(r.L,r.feats||{});
+  let h=`<div class="rcard static" style="border-left-color:${r.L.color}">
+    <h4><span class="sw" style="background:${r.L.color}"></span>${r.L.nm}<span class="pill">${r.L.theme}</span></h4>`;
+  // 深掘り解説（特徴の組み合わせ）を冒頭に強調表示
+  if(combo){h+=`<p class="deepread">${combo}</p>`;}
+  h+=`<ul>${r.texts.map(t=>`<li>${t}</li>`).join("")}</ul>`;
+  if(r.line==="marriage_line"){
+    h+=`<div class="when">結婚の時期：線の位置から、30代前半ごろにご縁の高まりが読み取れます（※流派により目盛りは異なります）。</div>`;
+  }
+  // アドバイス（諭し）
+  if(advice.length){
+    h+=`<div class="advice"><span class="atag">ひとこと</span>${advice.join(" ")}</div>`;
+  }
+  h+=`</div>`;
+  box.innerHTML=h;
+}
+function diagnoseHand(f){
+  const out=[];
+  LINE_ORDER.forEach(l=>{
+    const L=RULES.lines[l],ff=f[l]||{},texts=[];
+    for(const[feat,val]of Object.entries(ff)){
+      if(val==="standard")continue;
+      const t=L.rules[feat]&&L.rules[feat][val];if(t)texts.push(t);
+    }
+    if(texts.length)out.push({line:l,L,texts,feats:ff,absent:ff.presence==="absent"});
+  });
+  return out;
+}
+// 特徴の組み合わせから踏み込んだ一文を選ぶ
+function comboFor(L,feats){
+  if(!L.combos)return null;
+  // whenの条件を全て満たす最初のcomboを返す
+  for(const c of L.combos){
+    if(Object.entries(c.when).every(([k,v])=>feats[k]===v))return c.text;
+  }
+  return null;
+}
+// 特徴に対応するアドバイス文を集める
+function adviceFor(L,feats){
+  if(!L.advice)return [];
+  const out=[];
+  for(const[feat,val]of Object.entries(feats)){
+    const key=val;
+    if(L.advice[key])out.push(L.advice[key]);
+  }
+  return out;
+}
+function overall(diag){
+  const have=diag.filter(d=>d.L.group==="base"&&!d.absent);
+  if(!have.length)return "今は線の動きが穏やかな時期。これからの行動で手相は変わっていきます。";
+  const pick=have[Math.floor(Math.random()*have.length)];
+  return `いまのあなたは「${pick.L.theme}」が特に表れています。${pick.texts[0]}`;
+}
+function diffText(){
+  const opts=["生まれ持った素質を、努力でうまく活かしてきたタイプ。経験を重ねて成長しています。",
+    "生まれ持った運勢と今の生き方が一致。自分らしく無理のない歩み方ができています。",
+    "先天的なものと今の自分にギャップがあり、人生に変化や波が起こりやすい時期です。"];
+  return opts[Math.floor(Math.random()*opts.length)];
+}
+function recapture(){go(2);}
+function restart(){
+  state.handedness="right";state.mode="right";
+  document.querySelectorAll("#handednessOpts .opt").forEach((o,i)=>o.setAttribute("aria-pressed",i===0));
+  document.querySelectorAll("#modeOpts .opt").forEach((o,i)=>o.setAttribute("aria-pressed",i===0));
+  go(0);
+}
+</script>
+</body>
+</html>

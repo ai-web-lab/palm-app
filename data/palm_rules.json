@@ -1,0 +1,345 @@
+{
+  "$schema_version": "1.0",
+  "meta": {
+    "description": "手相占いアプリ 基本4線 診断ルール知識ベース",
+    "disclaimer": "本データは娯楽目的の手相学に基づく解釈であり、寿命・病気・死を断定する表現を含めないこと。",
+    "scope": "基本4線（生命線・知能線・感情線・運命線）のみ。特殊線・丘・サインは将来拡張。"
+  },
+
+  "hand_policy": {
+    "description": "左右どちらの手をどう扱うかの方針。アプリはmodeを1つ選んで運用する。",
+    "modes": {
+      "right_only": {
+        "label": "右手のみ（MVP推奨）",
+        "captured_hands": ["right"],
+        "interpretation_axis": "後天運（現在・未来・努力の結果）",
+        "note": "撮影1枚で完結。迷った場合は右手という定石に沿う。"
+      },
+      "both_hands": {
+        "label": "両手（本式・発展構成）",
+        "captured_hands": ["left", "right"],
+        "interpretation_axis": "左=先天運 / 右=後天運 + 左右差の比較",
+        "note": "左右差そのものを追加の診断軸として使う。"
+      }
+    },
+    "hand_meaning": {
+      "left": {
+        "axis": "先天運",
+        "represents": ["生まれ持った資質", "潜在能力", "幼少期〜前半の人生", "無意識の感性"]
+      },
+      "right": {
+        "axis": "後天運",
+        "represents": ["努力で築いたもの", "現在の状態", "後半の人生", "意識的な行動"]
+      }
+    },
+    "dominance_policy": {
+      "description": "両手モードのとき『どちらの手を主(現在・未来)として総合診断で重視するか』をユーザーが選ぶ設定。UIではラジオボタンで提示する。線の解釈文(lines)は性別・流派で変えず、ここでは主従の重み付けと先天/後天ラベルの割当だけを決める。",
+      "ui": {
+        "control": "radio",
+        "label": "どの流派で見ますか？",
+        "default": "handedness"
+      },
+      "options": [
+        {
+          "id": "handedness",
+          "label": "利き手で見る（現代の主流・おすすめ）",
+          "needs": ["handedness"],
+          "rule": "利き手=後天運(主) / 非利き手=先天運(従)",
+          "note": "最も広く使われる。迷ったらこれ。"
+        },
+        {
+          "id": "fixed_lr",
+          "label": "左右固定で見る（左=先天 / 右=後天）",
+          "needs": [],
+          "rule": "left=先天運(従) / right=後天運(主)",
+          "note": "利き手を問わず右手を主とする最もシンプルな説。"
+        },
+        {
+          "id": "gender_traditional",
+          "label": "男女で見る（伝統・東洋式）",
+          "needs": ["gender"],
+          "rule": "男性=左手を主 / 女性=右手を主",
+          "note": "古い東洋占術の『男左女右』説。諸説あり主流ではないが、遊び・伝統モードとして提供。先天/後天の意味自体は入れ替えない。"
+        },
+        {
+          "id": "age_based",
+          "label": "年齢で見る",
+          "needs": ["age"],
+          "rule": "35歳未満=左手を主 / 35歳以上=右手を主",
+          "note": "人生の節目で主に見る手を変える説。"
+        }
+      ],
+      "constraints": "性別・年齢・利き手で変わるのは『どちらを主とするか』だけ。左手=先天運/右手=後天運という各手の意味は全オプションで不変。"
+    },
+    "left_right_diff": {
+      "description": "両手モードのときのみ評価する、左右差による追加診断。",
+      "rules": [
+        {
+          "id": "diff_similar",
+          "condition": "left と right の各特徴量がほぼ同じ（差が閾値未満）",
+          "interpretation": "生まれ持った運勢と現在の生き方が一致。自分らしく無理のない生き方をしている。"
+        },
+        {
+          "id": "diff_large",
+          "condition": "left と right で特徴量が大きく異なる（差が閾値以上）",
+          "interpretation": "先天と後天にギャップがあり、人生に変化や波が起こりやすい。"
+        },
+        {
+          "id": "diff_right_better",
+          "condition": "right の方が線が濃く・明瞭（rightの総合スコア > leftの総合スコア）",
+          "interpretation": "生まれ持った素質を努力で活かし、経験を積んで成長してきたタイプ。"
+        }
+      ]
+    }
+  },
+
+  "feature_definitions": {
+    "description": "各線で測定する特徴量の定義。physical_measure は画像処理で取得する物理量との対応。",
+    "length": {
+      "type": "enum",
+      "values": ["long", "standard", "short"],
+      "physical_measure": "線を構成する画素列の全長 / 手のひら基準長で正規化"
+    },
+    "curve": {
+      "type": "enum",
+      "values": ["deep", "standard", "shallow"],
+      "physical_measure": "始点と終点を結ぶ直線からの最大乖離量（曲率）"
+    },
+    "depth": {
+      "type": "enum",
+      "values": ["dark", "standard", "faint"],
+      "physical_measure": "線部と周辺肌の輝度差・線幅"
+    },
+    "slope": {
+      "type": "enum",
+      "values": ["downward", "straight", "upward"],
+      "physical_measure": "始点に対する終点の角度（知能線で使用）"
+    },
+    "start_height": {
+      "type": "enum",
+      "values": ["high", "standard", "low"],
+      "physical_measure": "感情線の起点の縦位置（手のひら高さで正規化）"
+    },
+    "start_origin": {
+      "type": "enum",
+      "values": ["attached", "separated", "from_lifeline"],
+      "physical_measure": "起点が他線と接触/分離しているか（知能線・運命線で使用）"
+    },
+    "continuity": {
+      "type": "enum",
+      "values": ["continuous", "broken", "chained"],
+      "physical_measure": "線の連続性（途切れ画素の有無）"
+    },
+    "branching": {
+      "type": "enum",
+      "values": ["none", "forked", "multi"],
+      "physical_measure": "終端付近の分岐数（MVPでは任意・難度高）"
+    },
+    "presence": {
+      "type": "enum",
+      "values": ["present", "absent"],
+      "physical_measure": "線が検出できるか（運命線・太陽線・財運線・結婚線で使用。extra3線では特に重要）"
+    },
+    "count": {
+      "type": "enum",
+      "values": ["single", "multiple"],
+      "physical_measure": "同種の線の本数（太陽線・財運線・結婚線で使用。検出難度が高い）"
+    },
+    "direction": {
+      "type": "enum",
+      "values": ["upward", "straight", "downward"],
+      "physical_measure": "線の先端の向き（結婚線で使用。上向き/下向き）"
+    }
+  },
+
+  "lines": {
+    "life_line": {
+      "name_ja": "生命線",
+      "theme": "生命力・健康・バイタリティ",
+      "mvp_features": ["length", "curve", "depth"],
+      "advanced_features": ["continuity"],
+      "rules": [
+        { "feature": "length", "value": "long",     "interpretation": "安定したエネルギーを持続でき、持久力があり長期目標にコツコツ取り組むタイプ。" },
+        { "feature": "length", "value": "short",    "interpretation": "短命ではなく、環境変化に敏感で人生の途中で大きく方向転換しやすいタイプ。" },
+        { "feature": "curve",  "value": "deep",     "interpretation": "体力とバイタリティに溢れ、行動的で活動的な生活を好む。" },
+        { "feature": "curve",  "value": "shallow",  "interpretation": "体力より知力で勝負するタイプ。頭脳を活かす生活が合う。" },
+        { "feature": "depth",  "value": "dark",     "interpretation": "生命力・体力が強く、心身がタフ。" },
+        { "feature": "depth",  "value": "faint",    "interpretation": "繊細で協調性・柔軟性が高い。体調管理を意識するとよい。" },
+        { "feature": "continuity", "value": "broken", "interpretation": "その時期に引っ越し・転職・結婚などの転機の可能性。途切れた先に線が続くならリスタートの吉兆。" }
+      ],
+      "combos": [
+        { "when": { "length": "long", "depth": "dark" },   "text": "濃くて長い生命線は、心身ともにスタミナが豊富なしるし。多少の無理も乗り越えられる頑健さがあります。" },
+        { "when": { "length": "long", "curve": "deep" },   "text": "長く大きく張り出した生命線は、行動力と持久力を兼ね備えた相。やりたいことに全力で打ち込めるタイプです。" },
+        { "when": { "depth": "faint", "curve": "shallow" },"text": "細く控えめな生命線は、繊細でエネルギーの配分が上手なタイプ。頑張りすぎず自分のペースを保つほど力を発揮します。" }
+      ],
+      "advice": {
+        "faint": "疲れをため込みやすいので、休息と睡眠を意識的に。無理を続けないことが運気の安定につながります。",
+        "short": "環境の変わり目が転機になりやすい時期。体調の変化にも目を向けて、こまめにメンテナンスを。"
+      }
+    },
+
+    "head_line": {
+      "name_ja": "知能線（頭脳線）",
+      "theme": "思考タイプ・才能・適性",
+      "mvp_features": ["slope", "length"],
+      "advanced_features": ["branching", "start_origin"],
+      "rules": [
+        { "feature": "slope",  "value": "downward", "interpretation": "ロマンティストで創造的。芸術・クリエイティブ方面に強い。" },
+        { "feature": "slope",  "value": "straight", "interpretation": "現実的・論理的な思考タイプ。理系・ビジネス適性が高い。" },
+        { "feature": "length", "value": "long",     "interpretation": "じっくり考え計画的に行動する熟考タイプ。" },
+        { "feature": "length", "value": "short",    "interpretation": "直観力に優れ、瞬時に状況を把握してテキパキ動く。" },
+        { "feature": "branching", "value": "forked", "interpretation": "二面性を活かせるタイプ。下向き分岐は創造性、上向き分岐は現実的なビジネス力。" },
+        { "feature": "branching", "value": "multi",  "interpretation": "多才でチャレンジ精神旺盛。習得が早く表現力もある。" },
+        { "feature": "start_origin", "value": "attached",  "interpretation": "慎重で常識的。物事を堅実に進める。" },
+        { "feature": "start_origin", "value": "separated", "interpretation": "大胆で独立心が強く、行動が早い。" }
+      ]
+    },
+
+    "heart_line": {
+      "name_ja": "感情線",
+      "theme": "感情・愛情・対人関係",
+      "mvp_features": ["length", "start_height", "depth"],
+      "advanced_features": ["branching"],
+      "rules": [
+        { "feature": "length",       "value": "long",   "interpretation": "愛情深く面倒見がよい。情が厚く、独占欲もやや強め。" },
+        { "feature": "length",       "value": "short",  "interpretation": "淡白で冷静。あっさりした人付き合いを好む。" },
+        { "feature": "start_height", "value": "high",   "interpretation": "感情を素直に表現できる情熱的なタイプ。" },
+        { "feature": "start_height", "value": "low",    "interpretation": "クールで理性的。感情をコントロールできる。" },
+        { "feature": "depth",        "value": "dark",   "interpretation": "愛情表現が豊かで情熱的。芯が強い。" },
+        { "feature": "depth",        "value": "faint",  "interpretation": "繊細で控えめ。感情表現は穏やか。" },
+        { "feature": "branching",    "value": "forked", "interpretation": "感情が豊かで複雑。多面的で一言では表せない魅力を持つ。" }
+      ]
+    },
+
+    "fate_line": {
+      "name_ja": "運命線",
+      "theme": "仕事運・人生の流れ・社会での活躍",
+      "note": "個人差が最も大きい線。ない場合も異常ではない。流年法で時期も読める。",
+      "mvp_features": ["presence", "length", "depth"],
+      "advanced_features": ["start_origin", "continuity"],
+      "rules": [
+        { "feature": "presence", "value": "absent",      "interpretation": "異常ではなく、その時々で柔軟に生きる自由なタイプ。" },
+        { "feature": "length",   "value": "long",        "interpretation": "責任感が強く責務を全うできる。リーダー資質があり出世しやすい。" },
+        { "feature": "depth",    "value": "dark",        "interpretation": "意志が強くポリシーを持つ。頼られやすいが抱え込みに注意。" },
+        { "feature": "depth",    "value": "faint",       "interpretation": "悪い意味ではなく、自由で変化に富んだ生き方を示す。" },
+        { "feature": "start_origin", "value": "from_lifeline", "interpretation": "這い上がり線。自分の力で高みへ上り詰める努力型。" },
+        { "feature": "continuity",   "value": "broken",       "interpretation": "途切れの位置の年齢が人生の転機。結婚・転職・出世など。" },
+        { "feature": "continuity",   "value": "chained",      "interpretation": "変化が多いが、変わるたびにレベルアップしてリターンが大きい。" }
+      ]
+    },
+
+    "sun_line": {
+      "name_ja": "太陽線",
+      "aliases": ["成功線", "人気線", "金運線", "第二の運命線"],
+      "theme": "成功・人気・名声・お金を伴う幸福度",
+      "note": "誰にでもある線ではない。ない人も多く、特に若年層では出にくく30代以降に現れることも。ない=自立タイプと前向きに解釈する。",
+      "group": "extra3",
+      "mvp_features": [],
+      "advanced_features": ["presence", "length", "depth", "count"],
+      "rules": [
+        { "feature": "presence", "value": "present", "interpretation": "成功・人気・金運に恵まれる吉相。明るく人を惹きつける魅力を持つ。" },
+        { "feature": "presence", "value": "absent",  "interpretation": "自立タイプ。人のサポートに頼らず自分の力で成功や幸せを掴む。謙虚で誠実な人が多い。" },
+        { "feature": "length",   "value": "long",    "interpretation": "成功や人気を得る期間が長く続く。お金にも苦労しにくい。" },
+        { "feature": "length",   "value": "short",   "interpretation": "大器晩成の相。今は控えめでも晩年に成功が花開く。" },
+        { "feature": "depth",    "value": "dark",    "interpretation": "金運が上昇中。お金に困りにくい好調な状態。" },
+        { "feature": "depth",    "value": "faint",   "interpretation": "そこそこ成功しているが満足には至らず、収入はやや不安定かも。" },
+        { "feature": "count",    "value": "multiple","interpretation": "本業以外の副業でも稼げる多角経営タイプ。複数分野から評価される。" }
+      ]
+    },
+
+    "money_line": {
+      "name_ja": "財運線",
+      "aliases": ["財運線"],
+      "theme": "金運・蓄財力・お金の出入り",
+      "note": "太陽線が『お金を伴う幸福度』を見るのに対し、財運線は『お金の出入りの運気』を見る。ない人も多い。",
+      "group": "extra3",
+      "mvp_features": [],
+      "advanced_features": ["presence", "length", "depth", "count"],
+      "rules": [
+        { "feature": "presence", "value": "present", "interpretation": "金運・商売運に恵まれる。あるだけでラッキーな線。" },
+        { "feature": "presence", "value": "absent",  "interpretation": "お金への執着が薄いタイプ。収入よりやりがいを優先する生き方。" },
+        { "feature": "depth",    "value": "dark",    "interpretation": "お金を貯めたり財産を築くのが上手。お金の巡りがスムーズ。" },
+        { "feature": "length",   "value": "long",    "interpretation": "金運が良好で、蓄財に恵まれる。" },
+        { "feature": "count",    "value": "multiple","interpretation": "収入源は複数あるが浪費傾向。入っても手元に残りにくい。" }
+      ]
+    },
+
+    "marriage_line": {
+      "name_ja": "結婚線",
+      "aliases": ["結婚線"],
+      "theme": "結婚・パートナーシップ・出会いの時期",
+      "note": "小指の付け根と感情線の間の短い横線。最も変化しやすい線。本数=結婚回数ではなく『チャンスの回数』。長さ=結婚生活の質・結婚観であって期間ではない。複数あるときは最も濃い線で判断する。",
+      "group": "extra3",
+      "mvp_features": [],
+      "advanced_features": ["presence", "length", "depth", "count", "direction"],
+      "rules": [
+        { "feature": "presence",  "value": "absent",   "interpretation": "今は結婚への関心が薄い状態。一生独身という意味ではなく、気持ちが変われば線が現れる。" },
+        { "feature": "length",    "value": "long",     "interpretation": "結婚生活が安定し満足度が高い。理想やこだわりが強く、慎重に相手を選ぶ。" },
+        { "feature": "length",    "value": "short",    "interpretation": "直感的に結婚を決めるタイプ。こだわりが少なくスピード婚も。" },
+        { "feature": "depth",     "value": "dark",     "interpretation": "結婚への意識が強く縁が深い。結婚の可能性が高い。" },
+        { "feature": "depth",     "value": "faint",    "interpretation": "結婚願望が薄め、または縁が薄い。仕事中心の傾向。" },
+        { "feature": "count",     "value": "single",   "interpretation": "運命的な大恋愛の末に結婚する可能性。濃くはっきりなら理想の相手と結ばれる強い運。" },
+        { "feature": "count",     "value": "multiple", "interpretation": "結婚につながる出会いのチャンスが複数。最も濃い線が本命の時期を示す。" },
+        { "feature": "direction", "value": "upward",   "interpretation": "結婚で運が開ける。相性の良い相手に恵まれる吉相。" },
+        { "feature": "direction", "value": "downward", "interpretation": "注意のサイン。妥協しないよう意識すると良い（変化しうるので前向きに）。" }
+      ]
+    }
+  },
+
+  "flow_years": {
+    "description": "流年法（時期判定）。線上の位置を年齢に対応させる。線ごとに目盛りが異なる。",
+    "fate_line": {
+      "applies_to": "fate_line",
+      "description": "運命線の流年法。手首から中指付け根までを年齢に対応。",
+      "anchors": [
+        { "position_ratio": 0.0, "age": 0,   "note": "手首側＝若年" },
+        { "position_ratio": 0.25, "age": 21 },
+        { "position_ratio": 0.5,  "age": 30 },
+        { "position_ratio": 0.75, "age": 55 },
+        { "position_ratio": 1.0,  "age": 100, "note": "中指付け根側＝老年" }
+      ],
+      "usage": "continuity が broken の位置の position_ratio を年齢に変換し『◯歳ごろが転機』と提示する。"
+    },
+    "marriage_line": {
+      "applies_to": "marriage_line",
+      "description": "結婚線の流年法。感情線寄り＝若年、小指付け根寄り＝晩年。目盛りは流派で割れるため採用値を1つ決め注記すること（下記は中間=32-33歳説）。",
+      "axis": "感情線と小指付け根の間の縦位置",
+      "anchors": [
+        { "position_ratio": 0.0, "age": 16, "note": "感情線寄り＝早婚" },
+        { "position_ratio": 0.5, "age": 32, "note": "中間＝結婚適齢期(32-33歳)" },
+        { "position_ratio": 1.0, "age": 50, "note": "小指付け根寄り＝晩婚" }
+      ],
+      "alt_scale_note": "別流派では『中間=適齢期』のみを示し厳密な年齢目盛りを置かない。アプリは幅を持たせた表現（例：30代前半ごろ）が無難。",
+      "usage": "最も濃い結婚線の position_ratio を年齢に変換し『◯歳ごろに結婚のチャンス』と提示する。"
+    }
+  },
+
+  "challenges": {
+    "description": "7大線フル対応にあたっての既知の課題。実装方針の判断材料。",
+    "extra3_often_absent": {
+      "lines": ["sun_line", "money_line", "marriage_line"],
+      "issue": "太陽線・財運線・結婚線(0本)は『ない人』が非常に多い。基本4線と違い、未検出が正常状態。",
+      "mitigation": "未検出をエラー扱いせず presence=absent の前向きな解釈文を返す。検出失敗(画質不良)と本当に線がない状態の区別が難しい点に注意。"
+    },
+    "extra3_detection_hard": {
+      "lines": ["sun_line", "money_line", "marriage_line"],
+      "issue": "これらは短く細く薄いため、カメラ自動抽出の難度が基本4線より大幅に高い。手のしわ・関節の影と誤認しやすい。",
+      "mitigation": "MVPでは自動判定の対象外。Phase3で扱う。当面はユーザーが線をなぞる半自動入力か、診断を基本4線に限定する。"
+    },
+    "count_detection_unreliable": {
+      "feature": "count",
+      "issue": "本数(single/multiple)の自動カウントは特に不安定。細い支線や手のしわを線数に誤算入しやすい。",
+      "mitigation": "閾値（線幅・長さの下限）を設けて弱い線を除外。確信度が低い場合は本数に言及しない。"
+    },
+    "marriage_flowyear_scale_varies": {
+      "feature": "marriage_line 流年法",
+      "issue": "結婚時期の年齢目盛りが流派で大きく異なる（16-50歳説 / 32-33歳中間のみ説 等）。",
+      "mitigation": "1つの目盛りを採用し結果画面に注記。年齢はピンポイントでなく幅（例：30代前半）で提示する。"
+    },
+    "left_right_extra3": {
+      "feature": "extra3 の左右差",
+      "issue": "extra3線は左右で有無自体が違うことが多く、左右差ロジックをそのまま適用すると誤った比較になりうる。",
+      "mitigation": "両手モードでも extra3 は『主の手』のみで診断し、左右差比較は基本4線に限定するのが無難。"
+    }
+  }
+}
