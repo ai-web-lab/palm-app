@@ -107,10 +107,11 @@ type TraceCfg = {
 const linspace = (a: number, b: number, n: number) =>
   Array.from({ length: n }, (_, i) => a + ((b - a) * i) / (n - 1));
 
-// 生命線の弧：v(手首方向)が進むほど親指側(負u)へ膨らみ、また戻る
+// 生命線の弧：v(手首方向)が進むほど親指側(負u)へ膨らみ、また戻る。
+// 手の輪郭（外側の強い境界）へ吸着しないよう、中央寄り＆控えめな膨らみにする。
 const lifeArc = (v: number) => {
   const t = Math.max(0, Math.min(1, (v - 0.42) / (0.96 - 0.42)));
-  return -0.28 - 0.22 * Math.sin(Math.PI * t);
+  return -0.14 - 0.16 * Math.sin(Math.PI * t); // -0.14 〜 -0.30（中央寄り）
 };
 
 const CFG: Record<LineKey, TraceCfg> = {
@@ -120,8 +121,8 @@ const CFG: Record<LineKey, TraceCfg> = {
   head_line: { along: linspace(-0.25, 1.05, 14), searchAxis: "v", range: [0.22, 0.6], steps: 26, expected: () => 0.4, sigma: 0.09 },
   // 運命線：中央を縦に（v に沿い u を探索）
   fate_line: { along: linspace(0.95, 0.18, 14), searchAxis: "u", range: [0.28, 0.64], steps: 26, expected: () => 0.47, sigma: 0.1 },
-  // 生命線：親指側の弧（v に沿い u を負側で探索／弧の期待形状で誘導）
-  life_line: { along: linspace(0.42, 0.96, 16), searchAxis: "u", range: [-0.66, 0.05], steps: 34, expected: lifeArc, sigma: 0.16 },
+  // 生命線：親指側の弧（v に沿い u を負側で探索）。範囲を内側に制限し輪郭への吸着を防ぐ。
+  life_line: { along: linspace(0.42, 0.96, 16), searchAxis: "u", range: [-0.44, 0.06], steps: 30, expected: lifeArc, sigma: 0.12 },
   // 太陽線：薬指の下の短い縦線
   sun_line: { along: linspace(0.45, 0.22, 10), searchAxis: "u", range: [0.45, 0.82], steps: 20, expected: () => 0.63, sigma: 0.08 },
   // 財運線：薬指‑小指間の短い縦線
