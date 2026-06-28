@@ -35,7 +35,8 @@ palm-app/
     ├── 04_ui_flow.md          ← 画面遷移・各画面の仕様
     ├── 05_diagnosis_logic.md  ← 診断ロジック（ルール照合・深掘り・流年法）
     ├── 06_data_schema.md      ← palm_rules.json のスキーマ定義
-    └── 07_roadmap.md          ← 開発フェーズ・課題・リスク
+    ├── 07_roadmap.md          ← 開発フェーズ・課題・リスク
+    └── 08_line_extraction_design.md ← 実線抽出パイプライン設計（OpenCV.js, ②）
 ```
 
 ---
