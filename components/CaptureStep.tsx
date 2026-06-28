@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LINE_COLOR, LINE_ORDER, LINE_PATH, PALM_PATH } from "@/lib/rules";
+import leftGuide from "@/item/left.png";
+import rightGuide from "@/item/right.png";
 import type { Hand } from "@/lib/types";
 
 type Tab = "camera" | "upload";
@@ -16,13 +17,6 @@ interface Props {
   onComplete: (image: string) => void;
   onBack: () => void;
 }
-
-const BASE_GUIDE: Array<keyof typeof LINE_PATH> = [
-  "life_line",
-  "head_line",
-  "heart_line",
-  "fate_line",
-];
 
 export default function CaptureStep({
   hand,
@@ -43,7 +37,8 @@ export default function CaptureStep({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handLabel = hand === "right" ? "右手" : "左手";
-  const flip = hand === "left";
+  // 撮影ガイド画像（添付イラスト）。右手/左手それぞれ専用の絵を使う。
+  const guideSrc = hand === "right" ? rightGuide.src : leftGuide.src;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -127,8 +122,6 @@ export default function CaptureStep({
     setCamError(null);
   };
 
-  const guideOpacity = scanning ? 0 : 1;
-
   return (
     <section className="card">
       <h2>
@@ -204,45 +197,11 @@ export default function CaptureStep({
             </div>
           )}
 
-          {/* ガイド線＋検出イメージ（撮影画面と共通の座標系） */}
-          <svg className="overlay" viewBox="0 0 300 360" aria-hidden="true">
-            <g transform={flip ? "translate(300,0) scale(-1,1)" : ""}>
-              {!shot && tab === "camera" && (
-                <path
-                  d={PALM_PATH}
-                  fill="none"
-                  stroke="#46517f"
-                  strokeWidth={1.4}
-                  opacity={0.5}
-                />
-              )}
-              <g
-                id="guideLines"
-                stroke="#e8607a"
-                strokeWidth={2.4}
-                fill="none"
-                strokeDasharray="6 6"
-                strokeLinecap="round"
-                style={{ opacity: guideOpacity }}
-              >
-                {BASE_GUIDE.map((k) => (
-                  <path key={k} d={LINE_PATH[k]} />
-                ))}
-              </g>
-              <g style={{ opacity: scanning ? 1 : 0, transition: "opacity .5s" }}>
-                {LINE_ORDER.map((k) => (
-                  <path
-                    key={k}
-                    d={LINE_PATH[k]}
-                    fill="none"
-                    stroke={LINE_COLOR[k]}
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                  />
-                ))}
-              </g>
-            </g>
-          </svg>
+          {/* 撮影ガイド（添付イラスト）。カメラ起動中・未撮影のときに重ねる。 */}
+          {tab === "camera" && !shot && !scanning && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="guide-img" src={guideSrc} alt="" aria-hidden="true" />
+          )}
         </div>
 
         <div className="scan-hint">
