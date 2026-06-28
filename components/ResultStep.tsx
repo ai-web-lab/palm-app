@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   adviceFor,
   axisFor,
@@ -10,8 +10,17 @@ import {
   overall,
   primaryHand,
 } from "@/lib/diagnosis";
+import { detectHandLandmarks } from "@/lib/handDetect";
+import { computeLinePaths } from "@/lib/palmLines";
 import { LINE_COLOR, LINE_PATH, isExtra } from "@/lib/rules";
 import type { CapturedHand, Hand, LineKey, Mode } from "@/lib/types";
+
+type Detection = {
+  paths: Record<LineKey, string>;
+  natW: number;
+  natH: number;
+};
+type DetectStatus = "loading" | "ok" | "fail";
 
 interface Props {
   handedness: Hand;
@@ -53,6 +62,36 @@ export default function ResultStep({
     diag.length ? diag[0].line : null,
   );
 
+  // 手のランドマークを検出し、線を実際の手に追従させる。
+  const [detect, setDetect] = useState<Detection | null>(null);
+  const [status, setStatus] = useState<DetectStatus>("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus("loading");
+    setDetect(null);
+    const img = new Image();
+    img.onload = async () => {
+      const lm = await detectHandLandmarks(img);
+      if (cancelled) return;
+      if (lm && img.naturalWidth && img.naturalHeight) {
+        setDetect({
+          paths: computeLinePaths(lm, img.naturalWidth, img.naturalHeight),
+          natW: img.naturalWidth,
+          natH: img.naturalHeight,
+        });
+        setStatus("ok");
+      } else {
+        setStatus("fail");
+      }
+    };
+    img.onerror = () => !cancelled && setStatus("fail");
+    img.src = mainHand.image;
+    return () => {
+      cancelled = true;
+    };
+  }, [mainHand.image]);
+
   const flip = mainHand.hand === "left";
   const sel = diag.find((r) => r.line === selected) || null;
   const combo = sel ? comboFor(sel.def, sel.feats) : null;
@@ -69,37 +108,72 @@ export default function ResultStep({
         </p>
       </div>
 
-      {/* 取り込んだ実画像 ＋ 検出イメージのオーバーレイ */}
+      {/* 取り込んだ実画像 ＋ 手に追従させた線オーバーレイ */}
       <div className="photo-wrap">
         <img className="photo" src={mainHand.image} alt="あなたの手" />
-        <svg
-          className="photo-svg"
-          viewBox="0 0 300 360"
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <g transform={flip ? "translate(300,0) scale(-1,1)" : ""}>
-            {diag.map((r) => (
-              <path
-                key={r.line}
-                className={
-                  "pline" +
-                  (selected === r.line ? " sel" : "") +
-                  (selected && selected !== r.line ? " dim" : "")
-                }
-                d={LINE_PATH[r.line]}
-                fill="none"
-                stroke={LINE_COLOR[r.line]}
-                strokeLinecap="round"
-                onClick={() => setSelected(r.line)}
-              />
-            ))}
-          </g>
-        </svg>
+        {detect && status === "ok" ? (
+          // 検出成功：手のランドマークに合わせた線（画像ピクセル座標系）
+          <svg
+            className="photo-svg"
+            viewBox={`0 0 ${detect.natW} ${detect.natH}`}
+            preserveAspectRatio="xMidYMid slice"
+          >
+            {diag.map((r) => {
+              const base = Math.max(detect.natW, detect.natH) / 150;
+              const on = selected === r.line;
+              const dim = selected && !on;
+              return (
+                <path
+                  key={r.line}
+                  d={detect.paths[r.line]}
+                  fill="none"
+                  stroke={LINE_COLOR[r.line]}
+                  strokeLinecap="round"
+                  onClick={() => setSelected(r.line)}
+                  style={{
+                    cursor: "pointer",
+                    strokeWidth: on ? base * 1.9 : base,
+                    opacity: dim ? 0.3 : on ? 1 : 0.9,
+                    filter: on ? `drop-shadow(0 0 ${base}px currentColor)` : "none",
+                    transition: "all .2s",
+                  }}
+                />
+              );
+            })}
+          </svg>
+        ) : (
+          // フォールバック：固定座標（検出前/失敗時）
+          <svg
+            className="photo-svg"
+            viewBox="0 0 300 360"
+            preserveAspectRatio="xMidYMid slice"
+          >
+            <g transform={flip ? "translate(300,0) scale(-1,1)" : ""}>
+              {diag.map((r) => (
+                <path
+                  key={r.line}
+                  className={
+                    "pline" +
+                    (selected === r.line ? " sel" : "") +
+                    (selected && selected !== r.line ? " dim" : "")
+                  }
+                  d={LINE_PATH[r.line]}
+                  fill="none"
+                  stroke={LINE_COLOR[r.line]}
+                  strokeLinecap="round"
+                  onClick={() => setSelected(r.line)}
+                />
+              ))}
+            </g>
+          </svg>
+        )}
       </div>
       <p className="photo-hint">
-        ※ 線の位置はイメージです（自動の線検出は開発中）。
-        <br />
-        撮影・アップロードした実際の画像に重ねて表示しています。
+        {status === "loading"
+          ? "手の形を解析しています…"
+          : status === "ok"
+            ? "※ 検出した手の形に合わせて線の目安を表示しています（線そのものの自動検出は精度向上中）。"
+            : "※ 手をうまく検出できませんでした。線の位置はイメージです（手を枠いっぱい・明るい場所で撮ると精度が上がります）。"}
       </p>
 
       {/* 線チップ */}

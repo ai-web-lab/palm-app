@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 /out/
 next-env.d.ts
 *.tsbuildinfo
+
+# MediaPipe wasm (build時に node_modules からコピー)
+/public/mediapipe/
