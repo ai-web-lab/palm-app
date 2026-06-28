@@ -18,8 +18,17 @@ import {
   smoothPath,
   type Pt,
 } from "@/lib/palmLines";
-import { LINE_COLOR, LINE_ORDER, isExtra } from "@/lib/rules";
-import type { CapturedHand, Hand, LineKey, Mode } from "@/lib/types";
+import { LINE_COLOR, LINE_ORDER, RULES, isExtra } from "@/lib/rules";
+import type {
+  CapturedHand,
+  Hand,
+  LineKey,
+  LineResult,
+  Mode,
+} from "@/lib/types";
+
+/** CVで安定して検出する基本4線。検出できたら解説が無くても線を描く。 */
+const BASE4: LineKey[] = ["life_line", "head_line", "heart_line", "fate_line"];
 
 type LinePoints = Record<LineKey, Pt[]>;
 type Geom = { base: LinePoints; w: number; h: number };
@@ -79,13 +88,31 @@ export default function ResultStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effFeatures, mode]);
 
+  // 実際に検出できた基本線（CV信頼度≥しきい値 or AIが座標を返した線）。
+  // 解説の有無に関係なく描画・チップ表示する。
+  const [detected, setDetected] = useState<LineKey[]>([]);
+
+  // 表示する線＝「特記のある線(diag)」∪「検出できた基本線」。特記が無い線も描く。
+  const shown: LineResult[] = useMemo(() => {
+    const byLine = new Map(diag.map((r) => [r.line, r]));
+    const list: LineResult[] = [];
+    for (const k of LINE_ORDER) {
+      const r = byLine.get(k);
+      if (r) list.push(r);
+      else if (detected.includes(k)) {
+        list.push({ line: k, def: RULES.lines[k], feats: effFeatures[k] ?? {}, texts: [], absent: false });
+      }
+    }
+    return list;
+  }, [diag, detected, effFeatures]);
+
   const [selected, setSelected] = useState<LineKey | null>(null);
-  // diag が変わっても選択が有効な線を指すように保つ
+  // 表示集合が変わっても選択が有効な線を指すように保つ
   useEffect(() => {
     setSelected((cur) =>
-      cur && diag.some((r) => r.line === cur) ? cur : (diag[0]?.line ?? null),
+      cur && shown.some((r) => r.line === cur) ? cur : (shown[0]?.line ?? null),
     );
-  }, [diag]);
+  }, [shown]);
 
   // 手のランドマーク検出 → 線の初期配置（base）。pts は編集中の点。
   const [status, setStatus] = useState<DetectStatus>("loading");
@@ -123,6 +150,7 @@ export default function ResultStep({
       let usedAI = false;
       let usedCV = false;
       const base = {} as LinePoints;
+      const detKeys: LineKey[] = [];
       for (const key of LINE_ORDER) {
         const cvPts = cv?.lines[key];
         const cvConf = cv?.confidence[key] ?? 0;
@@ -130,13 +158,16 @@ export default function ResultStep({
         if (cvPts && cvPts.length >= 2 && cvConf >= CV_THRESHOLD) {
           base[key] = cvPts; // すでに画像px
           usedCV = true;
+          if (BASE4.includes(key)) detKeys.push(key);
         } else if (a && a.length >= 2) {
           base[key] = a.map((p) => ({ x: clamp01(p.x) * gw, y: clamp01(p.y) * gh }));
           usedAI = true;
+          if (BASE4.includes(key)) detKeys.push(key);
         } else {
           base[key] = template[key];
         }
       }
+      setDetected(detKeys);
       setGeom({ base, w: gw, h: gh });
       setPts(clonePoints(base));
       setStatus(usedCV ? "cv" : usedAI ? "ai" : lm ? "ok" : "fail");
@@ -164,7 +195,7 @@ export default function ResultStep({
     };
   }, [mainHand.image]);
 
-  const sel = diag.find((r) => r.line === selected) || null;
+  const sel = shown.find((r) => r.line === selected) || null;
   const combo = sel ? comboFor(sel.def, sel.feats) : null;
   const advice = sel ? adviceFor(sel.def, sel.feats) : [];
 
@@ -222,7 +253,7 @@ export default function ResultStep({
           </div>
         )}
         <p>
-          あなたの手から<b>{diag.length}本</b>
+          あなたの手から<b>{shown.length}本</b>
           の手相を読み取りました。線をタップすると解説が見られます。
         </p>
       </div>
@@ -237,7 +268,7 @@ export default function ResultStep({
             preserveAspectRatio="xMidYMid slice"
             style={{ touchAction: adjust ? "none" : "auto" }}
           >
-            {diag.map((r) => {
+            {shown.map((r) => {
               const on = selected === r.line;
               const dim = selected && !on;
               return (
@@ -317,7 +348,7 @@ export default function ResultStep({
 
       {/* 線チップ */}
       <div className="linechips">
-        {diag.map((r) => (
+        {shown.map((r) => (
           <button
             key={r.line}
             className={"lchip" + (isExtra(r.def) ? " extra" : "")}
@@ -343,9 +374,13 @@ export default function ResultStep({
           </h4>
           {combo && <p className="deepread">{combo}</p>}
           <ul>
-            {sel.texts.map((t, i) => (
-              <li key={i}>{t}</li>
-            ))}
+            {sel.texts.length > 0 ? (
+              sel.texts.map((t, i) => <li key={i}>{t}</li>)
+            ) : combo ? null : (
+              <li>
+                目立ったクセは控えめで、バランスのとれた{sel.def.theme}の持ち主です。
+              </li>
+            )}
           </ul>
           {sel.line === "marriage_line" && (
             <div className="when">
