@@ -170,7 +170,8 @@
       "combos": [
         { "when": { "length": "long", "depth": "dark" },   "text": "濃くて長い生命線は、心身ともにスタミナが豊富なしるし。多少の無理も乗り越えられる頑健さがあります。" },
         { "when": { "length": "long", "curve": "deep" },   "text": "長く大きく張り出した生命線は、行動力と持久力を兼ね備えた相。やりたいことに全力で打ち込めるタイプです。" },
-        { "when": { "depth": "faint", "curve": "shallow" },"text": "細く控えめな生命線は、繊細でエネルギーの配分が上手なタイプ。頑張りすぎず自分のペースを保つほど力を発揮します。" }
+        { "when": { "depth": "faint", "curve": "shallow" },"text": "細く控えめな生命線は、繊細でエネルギーの配分が上手なタイプ。頑張りすぎず自分のペースを保つほど力を発揮します。" },
+        { "when": { "length": "short", "depth": "dark" },  "text": "短くても濃い生命線は、一点集中型のエネルギー。決めた時期にぐっと力を注げる瞬発力があります。" }
       ],
       "advice": {
         "faint": "疲れをため込みやすいので、休息と睡眠を意識的に。無理を続けないことが運気の安定につながります。",
@@ -192,7 +193,16 @@
         { "feature": "branching", "value": "multi",  "interpretation": "多才でチャレンジ精神旺盛。習得が早く表現力もある。" },
         { "feature": "start_origin", "value": "attached",  "interpretation": "慎重で常識的。物事を堅実に進める。" },
         { "feature": "start_origin", "value": "separated", "interpretation": "大胆で独立心が強く、行動が早い。" }
-      ]
+      ],
+      "combos": [
+        { "when": { "slope": "downward", "length": "long" },  "text": "長く下へ伸びる知能線は、想像力が豊かで物事を深く掘り下げるタイプ。発想力を活かせる場で輝きます。" },
+        { "when": { "slope": "straight", "length": "long" },  "text": "まっすぐ長い知能線は、論理的で計画性が高い相。筋道を立てて考え、着実に成果を出せます。" },
+        { "when": { "slope": "straight", "length": "short" }, "text": "短くまっすぐな知能線は、決断が速く実行力に富むタイプ。考えるより動くほうが結果につながります。" }
+      ],
+      "advice": {
+        "downward": "考えすぎて立ち止まりやすい一面も。直感を信じて一歩踏み出すと、視界がひらけます。",
+        "short": "スピード感が魅力ですが、大事な決断はひと呼吸おくと、より後悔のない選択ができます。"
+      }
     },
 
     "heart_line": {
@@ -208,7 +218,16 @@
         { "feature": "depth",        "value": "dark",   "interpretation": "愛情表現が豊かで情熱的。芯が強い。" },
         { "feature": "depth",        "value": "faint",  "interpretation": "繊細で控えめ。感情表現は穏やか。" },
         { "feature": "branching",    "value": "forked", "interpretation": "感情が豊かで複雑。多面的で一言では表せない魅力を持つ。" }
-      ]
+      ],
+      "combos": [
+        { "when": { "length": "long", "depth": "dark" },        "text": "長く濃い感情線は、愛情深く情熱的な相。大切な人にまっすぐ尽くせる一方、思い入れが強くなりすぎることも。" },
+        { "when": { "length": "short", "start_height": "low" }, "text": "短く低い位置の感情線は、感情に流されず物事を見られる冷静なタイプ。落ち着いた人間関係を築けます。" },
+        { "when": { "depth": "faint", "start_height": "high" }, "text": "繊細でありながら素直な感情線。気持ちは豊かでも表現は控えめなので、言葉にして伝えると関係が深まります。" }
+      ],
+      "advice": {
+        "long": "情が深いぶん、相手への期待が大きくなりがち。少し力を抜いて向き合うと、人間関係がより心地よくなります。",
+        "dark": "感情がまっすぐ伝わる魅力がある一方、ヒートアップしやすい面も。大事な場面ではひと呼吸おくと吉。"
+      }
     },
 
     "fate_line": {
@@ -225,7 +244,15 @@
         { "feature": "start_origin", "value": "from_lifeline", "interpretation": "這い上がり線。自分の力で高みへ上り詰める努力型。" },
         { "feature": "continuity",   "value": "broken",       "interpretation": "途切れの位置の年齢が人生の転機。結婚・転職・出世など。" },
         { "feature": "continuity",   "value": "chained",      "interpretation": "変化が多いが、変わるたびにレベルアップしてリターンが大きい。" }
-      ]
+      ],
+      "combos": [
+        { "when": { "length": "long", "depth": "dark" }, "text": "長く濃い運命線は、芯の強さと責任感を備えた相。周囲から頼られ、人生を自分の手で切り拓いていけます。" },
+        { "when": { "depth": "faint" },                  "text": "うすめの運命線は、決まった型にとらわれず柔軟に進めるしるし。変化を楽しめる人ほど道がひらけます。" }
+      ],
+      "advice": {
+        "dark": "頼られて何でも背負い込みやすいタイプ。たまには人に任せると、長く力を発揮できます。",
+        "long": "責任感が強いぶん、休むのが苦手かも。意識して肩の力を抜く時間をつくると、運気がめぐります。"
+      }
     },
 
     "sun_line": {

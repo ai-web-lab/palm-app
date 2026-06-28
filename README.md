@@ -53,10 +53,32 @@ npx serve prototype
 
 撮影は実カメラではなくモック（撮影ボタンで擬似的に線を検出する演出）。
 
-### Next.js アプリ（本実装・移植先）
+### Next.js アプリ（本実装）
 フロントは **Next.js（React / App Router）** を採用。プロトタイプの画面フローと
-診断ロジックを移植し、入力は**実カメラ撮影**と**画像アップロード**の両対応にする。
-実機のカメラ・線検出は未実装（→ docs/07_roadmap.md のPhase 1）。
+診断ロジックを移植済みで、入力は**実カメラ撮影（getUserMedia）**と
+**画像アップロード**の両対応。
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+# 本番ビルド
+npm run build && npm run start
+```
+
+- 画面：利き手 → 占う手 → 撮影/アップロード → 結果。
+- 撮影画面は「カメラで撮影」「画像をアップロード」をタブで切替（どちらも片手ずつ）。
+- 知識ベース `data/palm_rules.json` を読み込んで診断（文言はコードに持たない）。
+- **線検出はまだモック**（特徴量をランダム生成）。結果画面に「自動の線検出は開発中」と明示。
+  実検出は未実装（→ docs/07_roadmap.md のPhase 1）。
+
+#### ディレクトリ
+```
+app/         ← Next.js App Router（layout / page / globals.css / icon）
+components/   ← CaptureStep（カメラ・アップロード）/ ResultStep
+lib/         ← rules（JSON読込・色・座標）/ diagnosis（診断ロジック・モック検出）/ types
+data/        ← palm_rules.json（知識ベース＝正本）
+prototype/   ← 旧プロトタイプ（仕様の正本として保存）
+```
 
 ---
 
