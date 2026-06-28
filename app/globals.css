@@ -446,8 +446,24 @@ header.top {
   text-align: center;
   color: var(--muted);
   font-size: 12px;
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   line-height: 1.7;
+}
+.adjust-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 0 0 16px;
+}
+.adjust-btn {
+  flex: 0 0 auto;
+  padding: 8px 18px;
+  font-size: 13px;
+}
+.adjust-btn[aria-pressed="true"] {
+  border-color: var(--gold);
+  color: var(--text);
+  background: #1a2046;
 }
 .linechips {
   display: flex;

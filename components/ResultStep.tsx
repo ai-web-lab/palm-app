@@ -11,15 +11,17 @@ import {
   primaryHand,
 } from "@/lib/diagnosis";
 import { detectHandLandmarks, normalizeImage } from "@/lib/handDetect";
-import { computeLinePaths } from "@/lib/palmLines";
-import { LINE_COLOR, LINE_PATH, isExtra } from "@/lib/rules";
+import {
+  computeLinePoints,
+  DEFAULT_LANDMARKS,
+  smoothPath,
+  type Pt,
+} from "@/lib/palmLines";
+import { LINE_COLOR, isExtra } from "@/lib/rules";
 import type { CapturedHand, Hand, LineKey, Mode } from "@/lib/types";
 
-type Detection = {
-  paths: Record<LineKey, string>;
-  natW: number;
-  natH: number;
-};
+type LinePoints = Record<LineKey, Pt[]>;
+type Geom = { base: LinePoints; w: number; h: number };
 type DetectStatus = "loading" | "ok" | "fail";
 
 interface Props {
@@ -36,6 +38,11 @@ const MODE_LABEL: Record<Mode, string> = {
   both: "両手",
 };
 
+const clonePoints = (o: LinePoints): LinePoints =>
+  Object.fromEntries(
+    Object.entries(o).map(([k, v]) => [k, v.map((p) => ({ ...p }))]),
+  ) as LinePoints;
+
 export default function ResultStep({
   handedness,
   mode,
@@ -44,8 +51,7 @@ export default function ResultStep({
   onRecapture,
 }: Props) {
   const main = primaryHand(mode, handedness);
-  const mainHand =
-    captured.find((h) => h.hand === main) || captured[0];
+  const mainHand = captured.find((h) => h.hand === main) || captured[0];
 
   // 描画のたびに乱数で揺れないよう一度だけ算出。
   const { diag, summary, diff } = useMemo(() => {
@@ -62,36 +68,39 @@ export default function ResultStep({
     diag.length ? diag[0].line : null,
   );
 
-  // 手のランドマークを検出し、線を実際の手に追従させる。
-  const [detect, setDetect] = useState<Detection | null>(null);
+  // 手のランドマーク検出 → 線の初期配置（base）。pts は編集中の点。
   const [status, setStatus] = useState<DetectStatus>("loading");
-  // 表示する画像（EXIF回転を焼き込んだ正規化後）。検出と同じ座標系にそろえる。
+  const [geom, setGeom] = useState<Geom | null>(null);
+  const [pts, setPts] = useState<LinePoints | null>(null);
+  const [adjust, setAdjust] = useState(false);
+  // 表示画像（EXIF回転を焼き込んだ正規化後）。検出と同じ座標系にそろえる。
   const [displayUrl, setDisplayUrl] = useState(mainHand.image);
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
-    setDetect(null);
+    setGeom(null);
+    setPts(null);
+    setAdjust(false);
     setDisplayUrl(mainHand.image);
     (async () => {
       const norm = await normalizeImage(mainHand.image);
       if (cancelled) return;
-      if (!norm) {
-        setStatus("fail");
-        return;
-      }
-      // 表示・検出・viewBox をこの正規化画像にそろえる。
-      setDisplayUrl(norm.url);
-      const lm = await detectHandLandmarks(norm.canvas);
+      const w = norm?.width ?? 300;
+      const h = norm?.height ?? 360;
+      if (norm) setDisplayUrl(norm.url);
+      const lm = norm ? await detectHandLandmarks(norm.canvas) : null;
       if (cancelled) return;
       if (lm) {
-        setDetect({
-          paths: computeLinePaths(lm, norm.width, norm.height),
-          natW: norm.width,
-          natH: norm.height,
-        });
+        const base = computeLinePoints(lm, w, h);
+        setGeom({ base, w, h });
+        setPts(clonePoints(base));
         setStatus("ok");
       } else {
+        // 検出できなくても、中央に初期配置してドラッグで合わせられるようにする。
+        const base = computeLinePoints(DEFAULT_LANDMARKS, 300, 360);
+        setGeom({ base, w: 300, h: 360 });
+        setPts(clonePoints(base));
         setStatus("fail");
       }
     })();
@@ -100,10 +109,44 @@ export default function ResultStep({
     };
   }, [mainHand.image]);
 
-  const flip = mainHand.hand === "left";
   const sel = diag.find((r) => r.line === selected) || null;
   const combo = sel ? comboFor(sel.def, sel.feats) : null;
   const advice = sel ? adviceFor(sel.def, sel.feats) : [];
+
+  const stroke = geom ? Math.max(geom.w, geom.h) / 150 : 2;
+
+  // 画面座標 → SVGユーザー座標（viewBox/cover を考慮）。
+  function toSvg(svg: SVGSVGElement, cx: number, cy: number): Pt | null {
+    const p = svg.createSVGPoint();
+    p.x = cx;
+    p.y = cy;
+    const m = svg.getScreenCTM();
+    if (!m) return null;
+    const r = p.matrixTransform(m.inverse());
+    return { x: r.x, y: r.y };
+  }
+
+  function startDrag(e: React.PointerEvent, line: LineKey, idx: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    const svg = (e.target as SVGElement).ownerSVGElement;
+    if (!svg) return;
+    const onMove = (ev: PointerEvent) => {
+      const p = toSvg(svg, ev.clientX, ev.clientY);
+      if (!p) return;
+      setPts((prev) =>
+        prev
+          ? { ...prev, [line]: prev[line].map((q, j) => (j === idx ? p : q)) }
+          : prev,
+      );
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   return (
     <section className="card">
@@ -116,73 +159,89 @@ export default function ResultStep({
         </p>
       </div>
 
-      {/* 取り込んだ実画像 ＋ 手に追従させた線オーバーレイ */}
+      {/* 取り込んだ実画像 ＋ 手に追従させた線オーバーレイ（ドラッグで微調整可） */}
       <div className="photo-wrap">
         <img className="photo" src={displayUrl} alt="あなたの手" />
-        {detect && status === "ok" ? (
-          // 検出成功：手のランドマークに合わせた線（画像ピクセル座標系）
+        {geom && pts && (
           <svg
             className="photo-svg"
-            viewBox={`0 0 ${detect.natW} ${detect.natH}`}
+            viewBox={`0 0 ${geom.w} ${geom.h}`}
             preserveAspectRatio="xMidYMid slice"
+            style={{ touchAction: adjust ? "none" : "auto" }}
           >
             {diag.map((r) => {
-              const base = Math.max(detect.natW, detect.natH) / 150;
               const on = selected === r.line;
               const dim = selected && !on;
               return (
                 <path
                   key={r.line}
-                  d={detect.paths[r.line]}
+                  d={smoothPath(pts[r.line])}
                   fill="none"
                   stroke={LINE_COLOR[r.line]}
                   strokeLinecap="round"
                   onClick={() => setSelected(r.line)}
                   style={{
                     cursor: "pointer",
-                    strokeWidth: on ? base * 1.9 : base,
+                    strokeWidth: on ? stroke * 1.9 : stroke,
                     opacity: dim ? 0.3 : on ? 1 : 0.9,
-                    filter: on ? `drop-shadow(0 0 ${base}px currentColor)` : "none",
-                    transition: "all .2s",
+                    filter: on
+                      ? `drop-shadow(0 0 ${stroke}px currentColor)`
+                      : "none",
+                    transition: adjust ? "none" : "all .2s",
                   }}
                 />
               );
             })}
-          </svg>
-        ) : (
-          // フォールバック：固定座標（検出前/失敗時）
-          <svg
-            className="photo-svg"
-            viewBox="0 0 300 360"
-            preserveAspectRatio="xMidYMid slice"
-          >
-            <g transform={flip ? "translate(300,0) scale(-1,1)" : ""}>
-              {diag.map((r) => (
-                <path
-                  key={r.line}
-                  className={
-                    "pline" +
-                    (selected === r.line ? " sel" : "") +
-                    (selected && selected !== r.line ? " dim" : "")
-                  }
-                  d={LINE_PATH[r.line]}
-                  fill="none"
-                  stroke={LINE_COLOR[r.line]}
-                  strokeLinecap="round"
-                  onClick={() => setSelected(r.line)}
+            {/* 調整モード：選択中の線の制御点をドラッグできる */}
+            {adjust &&
+              selected &&
+              pts[selected]?.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={stroke * 1.8}
+                  fill="#fff"
+                  stroke={LINE_COLOR[selected]}
+                  strokeWidth={stroke * 0.6}
+                  style={{ cursor: "grab" }}
+                  onPointerDown={(e) => startDrag(e, selected, i)}
                 />
               ))}
-            </g>
           </svg>
         )}
       </div>
+
       <p className="photo-hint">
         {status === "loading"
           ? "手の形を解析しています…"
-          : status === "ok"
-            ? "※ 検出した手の形に合わせて線の目安を表示しています（線そのものの自動検出は精度向上中）。"
-            : "※ 手をうまく検出できませんでした。線の位置はイメージです（手を枠いっぱい・明るい場所で撮ると精度が上がります）。"}
+          : adjust
+            ? "白い点をドラッグして、ご自身の手相線に合わせてください。"
+            : status === "ok"
+              ? "※ 検出した手の形に合わせて線を表示。ズレる場合は「線を合わせる」で微調整できます。"
+              : "※ 手をうまく検出できませんでした。「線を合わせる」で線を手に合わせてください。"}
       </p>
+
+      {/* 半自動：線をドラッグで合わせる */}
+      {status !== "loading" && (
+        <div className="adjust-bar">
+          <button
+            className="btn ghost adjust-btn"
+            aria-pressed={adjust}
+            onClick={() => setAdjust((a) => !a)}
+          >
+            {adjust ? "調整を終える" : "線を合わせる"}
+          </button>
+          {adjust && geom && (
+            <button
+              className="btn ghost adjust-btn"
+              onClick={() => setPts(clonePoints(geom.base))}
+            >
+              リセット
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 線チップ */}
       <div className="linechips">
@@ -193,10 +252,7 @@ export default function ResultStep({
             aria-pressed={selected === r.line}
             onClick={() => setSelected(r.line)}
           >
-            <span
-              className="cdot"
-              style={{ background: LINE_COLOR[r.line] }}
-            />
+            <span className="cdot" style={{ background: LINE_COLOR[r.line] }} />
             {r.def.name_ja}
           </button>
         ))}
@@ -209,10 +265,7 @@ export default function ResultStep({
           style={{ borderLeftColor: LINE_COLOR[sel.line], marginBottom: 16 }}
         >
           <h4>
-            <span
-              className="sw"
-              style={{ background: LINE_COLOR[sel.line] }}
-            />
+            <span className="sw" style={{ background: LINE_COLOR[sel.line] }} />
             {sel.def.name_ja}
             <span className="pill">{sel.def.theme}</span>
           </h4>

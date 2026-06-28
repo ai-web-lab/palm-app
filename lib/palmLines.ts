@@ -90,7 +90,7 @@ function affineFromTriangles(
 }
 
 /** 点列を Catmull-Rom で滑らかな SVG パス文字列にする。 */
-function smoothPath(pts: Pt[]): string {
+export function smoothPath(pts: Pt[]): string {
   if (pts.length < 2) return "";
   const f = (n: number) => n.toFixed(1);
   if (pts.length === 2) {
@@ -112,14 +112,15 @@ function smoothPath(pts: Pt[]): string {
 }
 
 /**
- * 21点ランドマーク（正規化座標 0..1）と画像の実寸から、各線のSVGパスを生成。
- * 返すパスは画像のピクセル座標系（viewBox = 0 0 natW natH 用）。
+ * 21点ランドマーク（正規化座標 0..1）と画像の実寸から、各線の制御点列を生成。
+ * 返す点は画像のピクセル座標系（viewBox = 0 0 natW natH 用）。
+ * 点列にしておくことで、ユーザーがドラッグして自分の手相線に合わせられる（半自動）。
  */
-export function computeLinePaths(
+export function computeLinePoints(
   landmarks: Pt[],
   natW: number,
   natH: number,
-): Record<LineKey, string> {
+): Record<LineKey, Pt[]> {
   const px = (i: number): Pt => ({
     x: landmarks[i].x * natW,
     y: landmarks[i].y * natH,
@@ -128,9 +129,22 @@ export function computeLinePaths(
     [ANCHOR.wrist, ANCHOR.index, ANCHOR.pinky],
     [px(0), px(5), px(17)],
   );
-  const out = {} as Record<LineKey, string>;
+  const out = {} as Record<LineKey, Pt[]>;
   (Object.keys(TEMPLATE) as LineKey[]).forEach((key) => {
-    out[key] = smoothPath(TEMPLATE[key].map(affine));
+    out[key] = TEMPLATE[key].map(affine);
   });
   return out;
 }
+
+/**
+ * 手を検出できなかったときの既定ランドマーク（正規化）。
+ * 画面中央に手があると仮定して線を初期配置し、ユーザーがドラッグで合わせる。
+ * 使うのは 0(手首)/5(人差し指付け根)/17(小指付け根) のみ。
+ */
+export const DEFAULT_LANDMARKS: Pt[] = Array.from({ length: 21 }, () => ({
+  x: 0.5,
+  y: 0.5,
+}));
+DEFAULT_LANDMARKS[0] = { x: 0.5, y: 0.95 };
+DEFAULT_LANDMARKS[5] = { x: 0.36, y: 0.33 };
+DEFAULT_LANDMARKS[17] = { x: 0.66, y: 0.36 };
