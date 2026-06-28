@@ -17,8 +17,42 @@ const MODEL_URL =
 
 let landmarkerPromise: Promise<HandLandmarker | null> | null = null;
 
+/**
+ * MediaPipe(TFLite/glog)が console.error 経由で出す“良性のINFO/WARNINGログ”を
+ * console.debug に振り替える。これらは例外ではなく、Next.jsの開発オーバーレイが
+ * 誤って「Console Error」として表示してしまうため。実エラーはそのまま通す。
+ */
+let consolePatched = false;
+function quietMediapipeLogs(): void {
+  if (consolePatched || typeof console === "undefined") return;
+  consolePatched = true;
+  const original = console.error.bind(console);
+  const benign = [
+    "TensorFlow Lite XNNPACK delegate",
+    "Created TensorFlow Lite",
+    "OpenGL error checking is disabled",
+    "landmark_projection_calculator",
+    "NORM_RECT without IMAGE_DIMENSIONS",
+    "gl_context",
+  ];
+  console.error = (...args: unknown[]) => {
+    const first = args[0];
+    if (
+      typeof first === "string" &&
+      (first.startsWith("INFO:") ||
+        /^[WIE]\d{4}\s/.test(first) || // glog 形式: W0628 ...
+        benign.some((b) => first.includes(b)))
+    ) {
+      console.debug("[mediapipe]", ...args);
+      return;
+    }
+    original(...args);
+  };
+}
+
 function getLandmarker(): Promise<HandLandmarker | null> {
   if (!landmarkerPromise) {
+    quietMediapipeLogs();
     landmarkerPromise = (async () => {
       try {
         const vision = await import("@mediapipe/tasks-vision");
