@@ -22,6 +22,8 @@ export interface CapturedHand {
   image: string;
   features: Record<LineKey, Features>;
   source: FeatureSource;
+  /** AIが推定した各線の正規化座標(0..1)。AI解析時のみ。 */
+  aiLines?: Partial<Record<LineKey, { x: number; y: number }[]>>;
 }
 
 /** 1線分の診断結果。 */

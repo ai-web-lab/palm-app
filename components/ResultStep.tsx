@@ -17,12 +17,14 @@ import {
   smoothPath,
   type Pt,
 } from "@/lib/palmLines";
-import { LINE_COLOR, isExtra } from "@/lib/rules";
+import { LINE_COLOR, LINE_ORDER, isExtra } from "@/lib/rules";
 import type { CapturedHand, Hand, LineKey, Mode } from "@/lib/types";
 
 type LinePoints = Record<LineKey, Pt[]>;
 type Geom = { base: LinePoints; w: number; h: number };
-type DetectStatus = "loading" | "ok" | "fail";
+type DetectStatus = "loading" | "ok" | "fail" | "ai";
+
+const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 
 interface Props {
   handedness: Hand;
@@ -94,18 +96,26 @@ export default function ResultStep({
       if (norm) setDisplayUrl(norm.url);
       const lm = norm ? await detectHandLandmarks(norm.canvas) : null;
       if (cancelled) return;
-      if (lm) {
-        const base = computeLinePoints(lm, w, h);
-        setGeom({ base, w, h });
-        setPts(clonePoints(base));
-        setStatus("ok");
-      } else {
-        // 検出できなくても、中央に初期配置してドラッグで合わせられるようにする。
-        const base = computeLinePoints(DEFAULT_LANDMARKS, 300, 360);
-        setGeom({ base, w: 300, h: 360 });
-        setPts(clonePoints(base));
-        setStatus("fail");
+
+      // 線の初期配置の優先順位：AI推定座標 > MediaPipeテンプレ追従 > 中央デフォルト。
+      const gw = norm ? w : 300;
+      const gh = norm ? h : 360;
+      const template = computeLinePoints(lm ?? DEFAULT_LANDMARKS, gw, gh);
+      const ai = mainHand.aiLines;
+      let usedAI = false;
+      const base = {} as LinePoints;
+      for (const key of LINE_ORDER) {
+        const a = ai?.[key];
+        if (a && a.length >= 2) {
+          base[key] = a.map((p) => ({ x: clamp01(p.x) * gw, y: clamp01(p.y) * gh }));
+          usedAI = true;
+        } else {
+          base[key] = template[key];
+        }
       }
+      setGeom({ base, w: gw, h: gh });
+      setPts(clonePoints(base));
+      setStatus(usedAI ? "ai" : lm ? "ok" : "fail");
     })();
     return () => {
       cancelled = true;
@@ -228,9 +238,11 @@ export default function ResultStep({
           ? "手の形を解析しています…"
           : adjust
             ? "白い点をドラッグして、ご自身の手相線に合わせてください。"
-            : status === "ok"
-              ? "※ 検出した手の形に合わせて線を表示。ズレる場合は「線を合わせる」で微調整できます。"
-              : "※ 手をうまく検出できませんでした。「線を合わせる」で線を手に合わせてください。"}
+            : status === "ai"
+              ? "※ AIが画像から線の位置を推定しました。ズレる場合は「線を合わせる」で微調整できます。"
+              : status === "ok"
+                ? "※ 検出した手の形に合わせて線を表示。ズレる場合は「線を合わせる」で微調整できます。"
+                : "※ 手をうまく検出できませんでした。「線を合わせる」で線を手に合わせてください。"}
       </p>
 
       {/* 半自動：線をドラッグで合わせる */}

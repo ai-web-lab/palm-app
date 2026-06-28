@@ -22,13 +22,27 @@ const ENUM = {
   direction: ["upward", "straight", "downward"],
 } as const;
 
+// 線に沿った正規化座標（0..1, 画像左上=0,0）の点列。線が無ければ空配列。
+const POINTS = {
+  type: "array",
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: ["x", "y"],
+    properties: { x: { type: "number" }, y: { type: "number" } },
+  },
+};
+
 const line = (props: Record<string, readonly string[]>) => ({
   type: "object",
   additionalProperties: false,
-  required: Object.keys(props),
-  properties: Object.fromEntries(
-    Object.entries(props).map(([k, v]) => [k, { type: "string", enum: v }]),
-  ),
+  required: [...Object.keys(props), "points"],
+  properties: {
+    ...Object.fromEntries(
+      Object.entries(props).map(([k, v]) => [k, { type: "string", enum: v }]),
+    ),
+    points: POINTS,
+  },
 });
 
 const SCHEMA = {
@@ -70,11 +84,15 @@ const SCHEMA = {
 } as const;
 
 const SYSTEM = [
-  "あなたは手のひら画像から手相の線の特徴量だけを観察して抽出する視覚アシスタント。",
-  "出力はスキーマ通りのenum値のみ。診断文・占い文・寿命/病気/人格への言及は一切しない。",
-  "判別が難しい特徴は必ず standard を選ぶ（無理に断定しない）。",
-  "運命線・太陽線・財運線・結婚線は『ない人』も多い。線が見えない場合は presence=absent。",
+  "あなたは手のひら画像から手相の線を観察し、各線の『特徴量』と『画像上の位置』を抽出する視覚アシスタント。",
+  "診断文・占い文・寿命/病気/人格への言及は一切しない。出力はスキーマ通りのデータのみ。",
+  "【特徴量】判別が難しい特徴は必ず standard（無理に断定しない）。",
+  "運命線・太陽線・財運線・結婚線は『ない人』も多い。線が見えなければ presence=absent。",
   "長さ・濃さ・カーブは手のひら全体に対する相対で判断する。",
+  "【位置(points)】各線について、実際に画像で見える線に沿って始点→終点の順に4〜6個の点を返す。",
+  "座標は画像の左上を(x=0,y=0)、右下を(x=1,y=1)とする正規化値（必ず0〜1の範囲）。",
+  "生命線=親指の付け根を回る弧、知能線/感情線=横方向、運命線=中央の縦方向、を目安に実線をなぞる。",
+  "線が見えない/absent の場合、その線の points は空配列にする。推測で描かない。",
 ].join("\n");
 
 export async function POST(req: Request) {
@@ -108,7 +126,7 @@ export async function POST(req: Request) {
   try {
     const res = await client.messages.create({
       model: "claude-opus-4-8",
-      max_tokens: 3000,
+      max_tokens: 4000,
       thinking: { type: "adaptive" },
       system: SYSTEM,
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
@@ -119,7 +137,7 @@ export async function POST(req: Request) {
             { type: "image", source: { type: "base64", media_type: mediaType, data } },
             {
               type: "text",
-              text: "この手のひら画像から、7本の手相線の特徴量をスキーマ通りに抽出してください。",
+              text: "この手のひら画像から、7本の手相線の特徴量と位置(points)をスキーマ通りに抽出してください。",
             },
           ],
         },
@@ -130,8 +148,19 @@ export async function POST(req: Request) {
     if (!textBlock || textBlock.type !== "text") {
       return Response.json({ error: "no_output" }, { status: 502 });
     }
-    const features = JSON.parse(textBlock.text);
-    return Response.json({ features, model: res.model });
+    // モデル出力（線ごとに features + points）を、診断用 features と座標 lines に分離。
+    const raw = JSON.parse(textBlock.text) as Record<
+      string,
+      Record<string, unknown> & { points?: { x: number; y: number }[] }
+    >;
+    const features: Record<string, Record<string, string>> = {};
+    const lines: Record<string, { x: number; y: number }[]> = {};
+    for (const [key, val] of Object.entries(raw)) {
+      const { points, ...feats } = val;
+      features[key] = feats as Record<string, string>;
+      lines[key] = Array.isArray(points) ? points : [];
+    }
+    return Response.json({ features, lines, model: res.model });
   } catch (e) {
     console.error("[diagnose] error:", e);
     return Response.json(

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import CaptureStep from "@/components/CaptureStep";
 import ResultStep from "@/components/ResultStep";
-import { fetchAIFeatures } from "@/lib/aiFeatures";
+import { fetchAIReading } from "@/lib/aiFeatures";
 import { genMockFeatures } from "@/lib/diagnosis";
+import { normalizeImage } from "@/lib/handDetect";
 import type { CapturedHand, Hand, Mode } from "@/lib/types";
 
 type OptionDef<T extends string> = {
@@ -140,13 +141,20 @@ export default function Home() {
 
   const handleComplete = async (image: string) => {
     const hand = scanQueue[scanIdx];
+    let img = image;
     let features = genMockFeatures();
     let source: CapturedHand["source"] = "mock";
+    let aiLines: CapturedHand["aiLines"];
 
     if (useAI) {
       setAnalyzing(true);
       try {
-        features = await fetchAIFeatures(image);
+        // 表示・検出・AI座標を同一基準にそろえるため、先にEXIF正規化した画像を使う。
+        const norm = await normalizeImage(image);
+        if (norm) img = norm.url;
+        const reading = await fetchAIReading(img);
+        features = reading.features;
+        aiLines = reading.lines;
         source = "ai";
       } catch {
         // 失敗時はモックにフォールバックし、結果画面で注記する。
@@ -156,7 +164,10 @@ export default function Home() {
       }
     }
 
-    const next: CapturedHand[] = [...captured, { hand, image, features, source }];
+    const next: CapturedHand[] = [
+      ...captured,
+      { hand, image: img, features, source, aiLines },
+    ];
     setCaptured(next);
     if (scanIdx < scanQueue.length - 1) {
       setScanIdx(scanIdx + 1);
