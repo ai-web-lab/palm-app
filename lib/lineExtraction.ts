@@ -88,8 +88,9 @@ function boxMean(
 
 type Tracer = (x: number, y: number) => number; // darkness ≥ 0
 
-const EXTRA: LineKey[] = ["sun_line", "money_line", "marriage_line"];
-const isExtraKey = (k: LineKey) => EXTRA.includes(k);
+// CVが安定して扱える基本4線のみ対象。extra3(太陽/財運/結婚線)は短く薄く、
+// 基本線(特に感情線)へ誤吸着しやすいためCVでは扱わない（AIモード or 未検出）。
+type BaseLine = "life_line" | "head_line" | "heart_line" | "fate_line";
 
 // ── 各線の探索設定（パーム座標系） ───────────────────────
 type TraceCfg = {
@@ -114,7 +115,7 @@ const lifeArc = (v: number) => {
   return -0.14 - 0.16 * Math.sin(Math.PI * t); // -0.14 〜 -0.30（中央寄り）
 };
 
-const CFG: Record<LineKey, TraceCfg> = {
+const CFG: Record<BaseLine, TraceCfg> = {
   // 感情線：付け根のすぐ下を 小指側→人差し指側 へ横断（u に沿い v を探索）
   heart_line: { along: linspace(1.25, 0.05, 14), searchAxis: "v", range: [0.04, 0.32], steps: 26, expected: () => 0.16, sigma: 0.06 },
   // 知能線：中央を横断（感情線より下）
@@ -123,12 +124,6 @@ const CFG: Record<LineKey, TraceCfg> = {
   fate_line: { along: linspace(0.95, 0.18, 14), searchAxis: "u", range: [0.28, 0.64], steps: 26, expected: () => 0.47, sigma: 0.1 },
   // 生命線：親指側の弧（v に沿い u を負側で探索）。範囲を内側に制限し輪郭への吸着を防ぐ。
   life_line: { along: linspace(0.42, 0.96, 16), searchAxis: "u", range: [-0.44, 0.06], steps: 30, expected: lifeArc, sigma: 0.12 },
-  // 太陽線：薬指の下の短い縦線
-  sun_line: { along: linspace(0.45, 0.22, 10), searchAxis: "u", range: [0.45, 0.82], steps: 20, expected: () => 0.63, sigma: 0.08 },
-  // 財運線：薬指‑小指間の短い縦線
-  money_line: { along: linspace(0.45, 0.26, 10), searchAxis: "u", range: [0.66, 0.98], steps: 20, expected: () => 0.82, sigma: 0.08 },
-  // 結婚線：小指の側面の短い横線（感情線より上＝指側。感情線への誤吸着を避け u>1.1 に）
-  marriage_line: { along: linspace(1.12, 1.34, 8), searchAxis: "v", range: [-0.05, 0.13], steps: 16, expected: () => 0.04, sigma: 0.04 },
 };
 
 function traceLine(
@@ -231,12 +226,11 @@ export function extractFromGray(
 
     // ── 特徴量の実測（低信頼は standard / absent） ──
     const f: Record<string, string> = {};
-    const hasPresence = key === "fate_line" || isExtraKey(key);
     if (conf < 0.25) {
-      // 線として弱い → presenceを持つ線は absent（base4の他は標準＝特記なし）
-      if (hasPresence) f.presence = "absent";
+      // 線として弱い → 運命線は absent（生命/知能/感情は標準＝特記なし）
+      if (key === "fate_line") f.presence = "absent";
     } else {
-      if (hasPresence) f.presence = "present";
+      if (key === "fate_line") f.presence = "present";
       // 濃さ
       f.depth = ratio > 2.4 ? "dark" : ratio < 1.7 ? "faint" : "standard";
       // 長さ（線長 / パーム高さ）
@@ -257,7 +251,6 @@ export function extractFromGray(
         const sv = toUV(sm[0]).v;
         f.start_height = sv < 0.12 ? "high" : sv > 0.2 ? "low" : "standard";
       }
-      if (isExtraKey(key)) f.count = "single";
     }
     features[key] = f;
   });

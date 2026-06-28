@@ -60,22 +60,32 @@ export default function ResultStep({
 }: Props) {
   const main = primaryHand(mode, handedness);
   const mainHand = captured.find((h) => h.hand === main) || captured[0];
-  const aiUsed = mainHand.source === "ai";
+  // 表示・診断に使う実効特徴量。初期はキャプチャ時のもの(AI or モック)。
+  // CV検出後に「実際に検出できた線の特徴」で上書きし、表示する線を決定論的にする。
+  const [effFeatures, setEffFeatures] = useState(mainHand.features);
+  const [diagSource, setDiagSource] = useState<"ai" | "cv" | "mock">(
+    mainHand.source === "ai" ? "ai" : "mock",
+  );
+  const aiUsed = diagSource === "ai";
+  const cvUsed = diagSource === "cv";
 
-  // 描画のたびに乱数で揺れないよう一度だけ算出。
   const { diag, summary, diff } = useMemo(() => {
-    const d = diagnoseHand(mainHand.features).filter((r) => !r.absent);
+    const d = diagnoseHand(effFeatures).filter((r) => !r.absent);
     return {
       diag: d,
       summary: overall(d),
       diff: mode === "both" ? diffText() : null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainHand]);
+  }, [effFeatures, mode]);
 
-  const [selected, setSelected] = useState<LineKey | null>(
-    diag.length ? diag[0].line : null,
-  );
+  const [selected, setSelected] = useState<LineKey | null>(null);
+  // diag が変わっても選択が有効な線を指すように保つ
+  useEffect(() => {
+    setSelected((cur) =>
+      cur && diag.some((r) => r.line === cur) ? cur : (diag[0]?.line ?? null),
+    );
+  }, [diag]);
 
   // 手のランドマーク検出 → 線の初期配置（base）。pts は編集中の点。
   const [status, setStatus] = useState<DetectStatus>("loading");
@@ -130,6 +140,24 @@ export default function ResultStep({
       setGeom({ base, w: gw, h: gh });
       setPts(clonePoints(base));
       setStatus(usedCV ? "cv" : usedAI ? "ai" : lm ? "ok" : "fail");
+
+      // 診断に使う特徴量の優先順位：AI(同意時) > CV(検出時の実測) > モック。
+      // CVを使う場合、表示する線は「実際に検出できた線」になり毎回同じ（決定論的）。
+      if (mainHand.source === "ai") {
+        setEffFeatures(mainHand.features);
+        setDiagSource("ai");
+      } else if (cv) {
+        // CVが扱うのは基本4線。extra3はCV非対象なので absent に固定（モックの揺れを排除）。
+        const merged = {} as typeof mainHand.features;
+        for (const key of LINE_ORDER) {
+          merged[key] = cv.features[key] ?? { presence: "absent" };
+        }
+        setEffFeatures(merged);
+        setDiagSource("cv");
+      } else {
+        setEffFeatures(mainHand.features);
+        setDiagSource("mock");
+      }
     })();
     return () => {
       cancelled = true;
@@ -182,6 +210,11 @@ export default function ResultStep({
         <h2>あなたの手相診断</h2>
         {aiUsed && (
           <div className="src-badge ai">AIが画像から線の特徴を読み取りました</div>
+        )}
+        {cvUsed && (
+          <div className="src-badge ai">
+            画像から検出した線の特徴で診断しました（試験的）
+          </div>
         )}
         {aiFailed && !aiUsed && (
           <div className="src-badge warn">
