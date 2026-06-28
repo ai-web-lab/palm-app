@@ -10,7 +10,7 @@ import {
   overall,
   primaryHand,
 } from "@/lib/diagnosis";
-import { detectHandLandmarks } from "@/lib/handDetect";
+import { detectHandLandmarks, normalizeImage } from "@/lib/handDetect";
 import { computeLinePaths } from "@/lib/palmLines";
 import { LINE_COLOR, LINE_PATH, isExtra } from "@/lib/rules";
 import type { CapturedHand, Hand, LineKey, Mode } from "@/lib/types";
@@ -65,28 +65,36 @@ export default function ResultStep({
   // 手のランドマークを検出し、線を実際の手に追従させる。
   const [detect, setDetect] = useState<Detection | null>(null);
   const [status, setStatus] = useState<DetectStatus>("loading");
+  // 表示する画像（EXIF回転を焼き込んだ正規化後）。検出と同じ座標系にそろえる。
+  const [displayUrl, setDisplayUrl] = useState(mainHand.image);
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
     setDetect(null);
-    const img = new Image();
-    img.onload = async () => {
-      const lm = await detectHandLandmarks(img);
+    setDisplayUrl(mainHand.image);
+    (async () => {
+      const norm = await normalizeImage(mainHand.image);
       if (cancelled) return;
-      if (lm && img.naturalWidth && img.naturalHeight) {
+      if (!norm) {
+        setStatus("fail");
+        return;
+      }
+      // 表示・検出・viewBox をこの正規化画像にそろえる。
+      setDisplayUrl(norm.url);
+      const lm = await detectHandLandmarks(norm.canvas);
+      if (cancelled) return;
+      if (lm) {
         setDetect({
-          paths: computeLinePaths(lm, img.naturalWidth, img.naturalHeight),
-          natW: img.naturalWidth,
-          natH: img.naturalHeight,
+          paths: computeLinePaths(lm, norm.width, norm.height),
+          natW: norm.width,
+          natH: norm.height,
         });
         setStatus("ok");
       } else {
         setStatus("fail");
       }
-    };
-    img.onerror = () => !cancelled && setStatus("fail");
-    img.src = mainHand.image;
+    })();
     return () => {
       cancelled = true;
     };
@@ -110,7 +118,7 @@ export default function ResultStep({
 
       {/* 取り込んだ実画像 ＋ 手に追従させた線オーバーレイ */}
       <div className="photo-wrap">
-        <img className="photo" src={mainHand.image} alt="あなたの手" />
+        <img className="photo" src={displayUrl} alt="あなたの手" />
         {detect && status === "ok" ? (
           // 検出成功：手のランドマークに合わせた線（画像ピクセル座標系）
           <svg

@@ -39,17 +39,59 @@ function getLandmarker(): Promise<HandLandmarker | null> {
 
 /** 画像から21点ランドマーク（正規化座標）を返す。検出できなければ null。 */
 export async function detectHandLandmarks(
-  img: HTMLImageElement,
+  src: HTMLImageElement | HTMLCanvasElement,
 ): Promise<Pt[] | null> {
   const landmarker = await getLandmarker();
   if (!landmarker) return null;
   try {
-    const res = landmarker.detect(img);
+    const res = landmarker.detect(src);
     const hand = res.landmarks?.[0];
     if (!hand || hand.length < 21) return null;
     return hand.map((p) => ({ x: p.x, y: p.y }));
   } catch (e) {
     console.warn("[handDetect] detect failed:", e);
+    return null;
+  }
+}
+
+export type NormalizedImage = {
+  canvas: HTMLCanvasElement;
+  width: number;
+  height: number;
+  /** 正規化後の表示用 dataURL（EXIF回転を焼き込み済み）。 */
+  url: string;
+};
+
+/**
+ * dataURL を Canvas に正規化する。スマホ写真等の EXIF 回転をピクセルへ焼き込み、
+ * 「表示・検出・座標系」をこの1枚に統一する（座標系の食い違いによるズレを防ぐ）。
+ */
+export async function normalizeImage(
+  dataUrl: string,
+): Promise<NormalizedImage | null> {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    let bmp: ImageBitmap;
+    try {
+      bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+    } catch {
+      bmp = await createImageBitmap(blob);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bmp, 0, 0);
+    bmp.close?.();
+    return {
+      canvas,
+      width: canvas.width,
+      height: canvas.height,
+      url: canvas.toDataURL("image/jpeg", 0.92),
+    };
+  } catch (e) {
+    console.warn("[handDetect] normalize failed:", e);
     return null;
   }
 }
