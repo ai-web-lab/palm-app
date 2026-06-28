@@ -118,10 +118,10 @@ const lifeArc = (v: number) => {
 const CFG: Record<BaseLine, TraceCfg> = {
   // 感情線：付け根のすぐ下を 小指側→人差し指側 へ横断（u に沿い v を探索）
   heart_line: { along: linspace(1.25, -0.15, 15), searchAxis: "v", range: [0.04, 0.32], steps: 26, expected: () => 0.16, sigma: 0.06 },
-  // 知能線：中央を横断（感情線より下）。少し上(指側)へ寄せる。
-  head_line: { along: linspace(-0.25, 1.05, 14), searchAxis: "v", range: [0.16, 0.5], steps: 26, expected: () => 0.33, sigma: 0.09 },
-  // 運命線：中央を縦に（v に沿い u を探索）
-  fate_line: { along: linspace(0.95, 0.18, 14), searchAxis: "u", range: [0.28, 0.64], steps: 26, expected: () => 0.47, sigma: 0.1 },
+  // 知能線：基準図に合わせ起点を親指‑人差し指の谷(生命線と共有, u≈-0.1)へ。右下がりに横断。
+  head_line: { along: linspace(-0.12, 0.95, 14), searchAxis: "v", range: [0.16, 0.5], steps: 26, expected: () => 0.33, sigma: 0.09 },
+  // 運命線：中央を縦に（v に沿い u を探索）。基準図のとおり中央やや橈側へ。
+  fate_line: { along: linspace(0.95, 0.18, 14), searchAxis: "u", range: [0.28, 0.64], steps: 26, expected: () => 0.45, sigma: 0.1 },
   // 生命線：親指側の弧（v に沿い u を負側で探索）。範囲を内側に制限し輪郭吸着を防止＆中央寄りに。
   life_line: { along: linspace(0.42, 0.96, 16), searchAxis: "u", range: [-0.36, 0.08], steps: 28, expected: lifeArc, sigma: 0.12 },
 };
