@@ -20,7 +20,9 @@
       → `lib/handDetect.ts`（検出）/ `lib/palmLines.ts`（幾何）。WASMは自前ホスト、モデルはCDN。
 - [ ] 基本4線の**実線抽出** → 線トレース（OpenCV.js）
       ↑ 未着手。現状は「位置の目安」を手に合わせて表示しているが、線そのものは未検出。
-        特徴量（length/curve/depth…）も依然**モック生成**。
+- [x] **（任意・β）LLM特徴量抽出**：同意時のみ画像を Claude Vision に送り、特徴量を
+      構造化出力で取得 → 既存診断へ（`app/api/diagnose` / `lib/aiFeatures.ts`）。
+      未同意・失敗時はモックにフォールバック。※外部送信のため同意必須。
 - [ ] 検出失敗時のUX（撮り直し誘導）※フォールバック表示は実装済み
 - [ ] 基本4線の領域抽出 → 線トレース（OpenCV.js）
 - [ ] 特徴量の量子化（length/curve/depth/slope/start_height）

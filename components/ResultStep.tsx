@@ -28,6 +28,7 @@ interface Props {
   handedness: Hand;
   mode: Mode;
   captured: CapturedHand[];
+  aiFailed?: boolean;
   onRestart: () => void;
   onRecapture: () => void;
 }
@@ -47,11 +48,13 @@ export default function ResultStep({
   handedness,
   mode,
   captured,
+  aiFailed,
   onRestart,
   onRecapture,
 }: Props) {
   const main = primaryHand(mode, handedness);
   const mainHand = captured.find((h) => h.hand === main) || captured[0];
+  const aiUsed = mainHand.source === "ai";
 
   // 描画のたびに乱数で揺れないよう一度だけ算出。
   const { diag, summary, diff } = useMemo(() => {
@@ -153,6 +156,14 @@ export default function ResultStep({
       <div className="result-head">
         <div className="axis">{axisFor(mainHand.hand, handedness)}</div>
         <h2>あなたの手相診断</h2>
+        {aiUsed && (
+          <div className="src-badge ai">AIが画像から線の特徴を読み取りました</div>
+        )}
+        {aiFailed && !aiUsed && (
+          <div className="src-badge warn">
+            AI解析に失敗したため、参考表示に切り替えました
+          </div>
+        )}
         <p>
           あなたの手から<b>{diag.length}本</b>
           の手相を読み取りました。線をタップすると解説が見られます。

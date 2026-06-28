@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import CaptureStep from "@/components/CaptureStep";
 import ResultStep from "@/components/ResultStep";
+import { fetchAIFeatures } from "@/lib/aiFeatures";
 import { genMockFeatures } from "@/lib/diagnosis";
 import type { CapturedHand, Hand, Mode } from "@/lib/types";
 
@@ -119,6 +120,10 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("right");
   const [scanIdx, setScanIdx] = useState(0);
   const [captured, setCaptured] = useState<CapturedHand[]>([]);
+  // AI特徴量抽出（画像を外部APIへ送信）。同意したときだけ有効。
+  const [useAI, setUseAI] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiFailed, setAiFailed] = useState(false);
 
   const scanQueue: Hand[] = mode === "both" ? ["right", "left"] : [mode];
 
@@ -129,15 +134,29 @@ export default function Home() {
   const startCapture = () => {
     setScanIdx(0);
     setCaptured([]);
+    setAiFailed(false);
     setStep(2);
   };
 
-  const handleComplete = (image: string) => {
+  const handleComplete = async (image: string) => {
     const hand = scanQueue[scanIdx];
-    const next: CapturedHand[] = [
-      ...captured,
-      { hand, image, features: genMockFeatures() },
-    ];
+    let features = genMockFeatures();
+    let source: CapturedHand["source"] = "mock";
+
+    if (useAI) {
+      setAnalyzing(true);
+      try {
+        features = await fetchAIFeatures(image);
+        source = "ai";
+      } catch {
+        // 失敗時はモックにフォールバックし、結果画面で注記する。
+        setAiFailed(true);
+      } finally {
+        setAnalyzing(false);
+      }
+    }
+
+    const next: CapturedHand[] = [...captured, { hand, image, features, source }];
     setCaptured(next);
     if (scanIdx < scanQueue.length - 1) {
       setScanIdx(scanIdx + 1);
@@ -151,6 +170,7 @@ export default function Home() {
     setMode("right");
     setScanIdx(0);
     setCaptured([]);
+    setAiFailed(false);
     setStep(0);
   };
 
@@ -199,6 +219,21 @@ export default function Home() {
             片手だけでも占えます。両手だと「生まれ持った自分」と「いまの自分」の違いも読めます。
           </p>
           <OptionList opts={MODE_OPTS} value={mode} onChange={setMode} />
+
+          <label className="ai-consent">
+            <input
+              type="checkbox"
+              checked={useAI}
+              onChange={(e) => setUseAI(e.target.checked)}
+            />
+            <span>
+              <b>AIで手相を解析する（β）</b>
+              <span>
+                画像を外部AI(Anthropic)に送信して線を読み取ります。チェックしない場合は端末内で完結（特徴量はモック）。
+              </span>
+            </span>
+          </label>
+
           <div className="nav">
             <button className="btn ghost" onClick={() => setStep(0)}>
               戻る
@@ -227,9 +262,19 @@ export default function Home() {
           handedness={handedness}
           mode={mode}
           captured={captured}
+          aiFailed={aiFailed}
           onRestart={restart}
           onRecapture={startCapture}
         />
+      )}
+
+      {analyzing && (
+        <div className="analyzing-overlay">
+          <div className="analyzing-box">
+            <div className="spinner" />
+            AIが手相を解析しています…
+          </div>
+        </div>
       )}
     </div>
   );

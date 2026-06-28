@@ -165,6 +165,85 @@ header.top {
   stroke: var(--ink);
 }
 
+.ai-consent {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  max-width: 380px;
+  margin: 16px auto 0;
+  padding: 13px 15px;
+  background: #0e1330;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  cursor: pointer;
+}
+.ai-consent input {
+  margin-top: 3px;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--gold);
+  flex: none;
+}
+.ai-consent b {
+  display: block;
+  font-size: 13.5px;
+  margin-bottom: 2px;
+}
+.ai-consent span span {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.analyzing-overlay {
+  position: fixed;
+  inset: 0;
+  background: #070a1ccc;
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+.analyzing-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: var(--text);
+  font-size: 14px;
+}
+.spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid var(--line);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.src-badge {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 4px 13px;
+}
+.src-badge.ai {
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+  font-weight: 700;
+}
+.src-badge.warn {
+  color: var(--gold-soft);
+  border: 1px solid var(--line);
+}
+
 .nav {
   display: flex;
   gap: 12px;
