@@ -34,8 +34,8 @@ type LinePoints = Record<LineKey, Pt[]>;
 type Geom = { base: LinePoints; w: number; h: number };
 type DetectStatus = "loading" | "ok" | "fail" | "ai" | "cv";
 
-/** 実線抽出を採用する信頼度しきい値。 */
-const CV_THRESHOLD = 0.4;
+/** 実線抽出を採用する信頼度しきい値。Bの頑健化で線らしさ指標を強化したため緩和。 */
+const CV_THRESHOLD = 0.35;
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 

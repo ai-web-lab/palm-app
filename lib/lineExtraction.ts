@@ -130,35 +130,76 @@ function traceLine(
   cfg: TraceCfg,
   P: (u: number, v: number) => Pt,
   dark: Tracer,
-): { pts: Pt[]; darks: number[] } {
+): { pts: Pt[]; darks: number[]; sList: number[]; prominence: number } {
+  const steps = cfg.steps;
+  const sAt = (i: number) => cfg.range[0] + ((cfg.range[1] - cfg.range[0]) * i) / (steps - 1);
+
+  // ── 粗探索：探索軸方向の暗さプロファイルから「実際の線位置」を自動検出（B） ──
+  // 各手で線は正準位置からズレるため、まず帯全体の暗さ合計のピークを求め、
+  // 期待帯をそこへシフトする。遠い輪郭への飛びつきは広いガウスで抑制。
+  let meanE = 0;
+  for (const a of cfg.along) meanE += cfg.expected(a);
+  meanE /= cfg.along.length;
+  const profile = new Array(steps).fill(0);
+  for (const a of cfg.along) {
+    for (let i = 0; i < steps; i++) {
+      const s = sAt(i);
+      const p = P(cfg.searchAxis === "v" ? a : s, cfg.searchAxis === "v" ? s : a);
+      profile[i] += dark(Math.round(p.x), Math.round(p.y));
+    }
+  }
+  const broad = 2.2 * cfg.sigma;
+  let peakI = 0;
+  let peakVal = -1;
+  for (let i = 0; i < steps; i++) {
+    const w = Math.exp(-((sAt(i) - meanE) * (sAt(i) - meanE)) / (2 * broad * broad));
+    const val = profile[i] * w;
+    if (val > peakVal) {
+      peakVal = val;
+      peakI = i;
+    }
+  }
+  let offset = sAt(peakI) - meanE;
+  const maxShift = 2.0 * cfg.sigma; // 輪郭吸着防止に移動量を制限
+  offset = Math.max(-maxShift, Math.min(maxShift, offset));
+
+  // プロファイルのピーク突出度＝「単一の明瞭な溝」か「のっぺりしたテクスチャ」かの指標。
+  // 本物の線は突出した1本の谷を作る（prominence高）。テクスチャは平坦（低）。
+  const profSorted = [...profile].sort((a, b) => a - b);
+  const profMed = profSorted[Math.floor(profSorted.length / 2)];
+  const profMax = Math.max(...profile);
+  const prominence = profMax > 1e-9 ? Math.max(0, (profMax - profMed) / profMax) : 0;
+
+  // ── 精探索：シフト後の期待位置を中心にトレース ──
   const pts: Pt[] = [];
   const darks: number[] = [];
+  const sList: number[] = [];
   for (const a of cfg.along) {
-    const e = cfg.expected(a);
+    const e = cfg.expected(a) + offset;
     let bestScore = -1;
     let bestPt: Pt | null = null;
     let bestDark = 0;
-    for (let i = 0; i < cfg.steps; i++) {
-      const s = cfg.range[0] + ((cfg.range[1] - cfg.range[0]) * i) / (cfg.steps - 1);
-      const uu = cfg.searchAxis === "v" ? a : s;
-      const vv = cfg.searchAxis === "v" ? s : a;
-      const p = P(uu, vv);
+    let bestS = e;
+    for (let i = 0; i < steps; i++) {
+      const s = sAt(i);
+      const p = P(cfg.searchAxis === "v" ? a : s, cfg.searchAxis === "v" ? s : a);
       const d = dark(Math.round(p.x), Math.round(p.y));
-      // 暗さ × 期待位置への近さ（ガウス重み）で評価＝誤スナップ抑制
       const w = Math.exp(-((s - e) * (s - e)) / (2 * cfg.sigma * cfg.sigma));
       const score = d * w;
       if (score > bestScore) {
         bestScore = score;
         bestPt = p;
         bestDark = d;
+        bestS = s;
       }
     }
     if (bestPt) {
       pts.push(bestPt);
       darks.push(bestDark);
+      sList.push(bestS);
     }
   }
-  return { pts, darks };
+  return { pts, darks, sList, prominence };
 }
 
 // 移動平均で点列の揺れを抑え、~6点へ間引く
@@ -212,12 +253,16 @@ export function extractFromGray(
 ): ExtractResult {
   const { P, toUV, palmW, palmH } = palmFrame(lmPx);
   const I = integralImage(gray, W, H);
-  const rBig = Math.max(3, Math.round(palmW * 0.11));
-  const rSmall = Math.max(1, Math.round(palmW * 0.012));
+  const rBig = Math.max(3, Math.round(palmW * 0.1));
+  const rSmall = Math.max(1, Math.round(palmW * 0.014));
+  // 照明不変な相対コントラスト（Weber風）：明るい照明でも薄い溝を拾えるよう、
+  // 局所の明るさで正規化する。d = (周囲平均 - 中心平均) / 周囲平均。
   const dark: Tracer = (x, y) => {
     if (x < 0 || y < 0 || x >= W || y >= H) return 0;
-    const d = boxMean(I, W, H, x, y, rBig) - boxMean(I, W, H, x, y, rSmall);
-    return d > 0 ? d : 0; // 周囲より暗い＝線らしい
+    const mBig = boxMean(I, W, H, x, y, rBig);
+    const mSmall = boxMean(I, W, H, x, y, rSmall);
+    const d = (mBig - mSmall) / (mBig + 8);
+    return d > 0 ? d : 0; // 周囲より相対的に暗い＝線らしい
   };
 
   // 参照：手のひら領域の典型 darkness（しきい値用）
@@ -229,18 +274,34 @@ export function extractFromGray(
     }
   }
   refs.sort((a, b) => a - b);
-  const refMedian = refs[Math.floor(refs.length / 2)] || 1;
+  // クリーンな肌では median=0 になりうる。Weber スケールの最大は1なので、
+  // 0 を 1 に置換すると比が壊れる（バグ）。小さな床値でクランプする。
+  const refMedian = Math.max(refs[Math.floor(refs.length / 2)] ?? 0, 1e-3);
 
   const lines: ExtractResult["lines"] = {};
   const features: ExtractResult["features"] = {};
   const confidence: ExtractResult["confidence"] = {};
 
   (Object.keys(CFG) as (keyof typeof CFG)[]).forEach((key) => {
-    const { pts, darks } = traceLine(CFG[key], P, dark);
+    const cfg = CFG[key];
+    const { pts, darks, sList, prominence } = traceLine(cfg, P, dark);
     const lineMean = mean(darks);
-    const ratio = lineMean / (refMedian + 1e-6);
-    // 線らしさ：周囲中央値の何倍暗いか
-    const conf = Math.max(0, Math.min(1, (ratio - 1.3) / 2));
+    const ratio = lineMean / refMedian;
+    // ── 線らしさ＝複数要素の積で「本物の線」と「肌テクスチャ」を区別する（B） ──
+    // 1) 暗さ比：周囲中央値より相対的に暗いほど線らしい
+    const darkFactor = Math.max(0, Math.min(1, (ratio - 1.15) / 1.6));
+    // 2) 突出度：探索帯に明瞭な1本の谷があるか（テクスチャは平坦で低い）
+    const promFactor = Math.max(0, Math.min(1, (prominence - 0.35) / 0.5));
+    // 3) 連続性：トレース上で暗さが一定以上を保つ割合（テクスチャは断続的）
+    const dmax = Math.max(...darks, 1e-6);
+    const continuity = darks.filter((d) => d >= 0.5 * dmax).length / (darks.length || 1);
+    // 4) 平滑性：探索位置 s が滑らかに変化するか（テクスチャ追従はジグザグ）
+    let jag = 0;
+    for (let i = 1; i < sList.length; i++) jag += Math.abs(sList[i] - sList[i - 1]);
+    jag = sList.length > 1 ? jag / (sList.length - 1) : 0;
+    const smooth = Math.max(0, 1 - jag / (1.8 * cfg.sigma));
+    // 暗さ×突出度を主信号に、連続性・平滑性で補正（本物でも多少ゆらぐため下駄あり）。
+    const conf = darkFactor * promFactor * (0.5 + 0.5 * continuity) * (0.55 + 0.45 * smooth);
     confidence[key] = conf;
 
     const sm = smoothDownsample(pts, 6);
@@ -253,8 +314,8 @@ export function extractFromGray(
       if (key === "fate_line") f.presence = "absent";
     } else {
       if (key === "fate_line") f.presence = "present";
-      // 濃さ
-      f.depth = ratio > 2.4 ? "dark" : ratio < 1.7 ? "faint" : "standard";
+      // 濃さ（Weber相対コントラストの絶対値で判定）
+      f.depth = lineMean > 0.05 ? "dark" : lineMean < 0.02 ? "faint" : "standard";
       // 長さ（線長 / パーム高さ）
       const len = polylineLen(sm) / (palmH || 1);
       f.length = len > 1.05 ? "long" : len < 0.75 ? "short" : "standard";
