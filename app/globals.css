@@ -165,17 +165,44 @@ header.top {
   stroke: var(--ink);
 }
 
+.ai-pick {
+  max-width: 380px;
+  margin: 18px auto 0;
+}
+.ai-pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4px 8px;
+}
+.ai-pick-head b {
+  font-size: 13px;
+  color: var(--muted);
+}
+.ai-rec {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  background: #2a220a;
+  border: 1px solid #5a4a14;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
 .ai-consent {
   display: flex;
   gap: 11px;
   align-items: flex-start;
-  max-width: 380px;
-  margin: 16px auto 0;
+  margin: 0 auto;
   padding: 13px 15px;
   background: #0e1330;
   border: 1px solid var(--line);
   border-radius: 13px;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ai-consent[data-on="true"] {
+  background: #121a3d;
+  border-color: var(--gold);
 }
 .ai-consent input {
   margin-top: 3px;

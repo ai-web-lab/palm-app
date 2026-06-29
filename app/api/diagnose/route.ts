@@ -89,11 +89,15 @@ const SYSTEM = [
   "【特徴量】判別が難しい特徴は必ず standard（無理に断定しない）。",
   "運命線・太陽線・財運線・結婚線は『ない人』も多い。線が見えなければ presence=absent。",
   "長さ・濃さ・カーブは手のひら全体に対する相対で判断する。",
-  "【位置(points)】各線について、実際に画像で見える線に沿って始点→終点の順に4〜6個の点を返す。",
+  "【手の向きを最初に見極める】まず親指がどちら側にあるか確認する。手のひらをカメラに向けた右手は親指が画像の左側、左手は親指が画像の右側に写る。",
+  "生命線と知能線は親指と人差し指の間（親指側）から始まる。親指の位置を取り違えると全体がずれるので必ず最初に特定する。",
+  "【位置(points)】各線について、実際に画像で見える線（しわ）に沿って始点→終点の順に4〜6個の点を返す。手の輪郭ではなく手のひら内部のしわをなぞること。",
   "座標は画像の左上を(x=0,y=0)、右下を(x=1,y=1)とする正規化値（必ず0〜1の範囲）。",
-  "生命線=親指の付け根を回る弧、知能線/感情線=横方向、運命線=中央の縦方向、を目安に実線をなぞる。",
+  "生命線=親指の付け根を囲む弧、知能線=手のひら中央を横断、感情線=指の付け根寄りを横断、運命線=手首から中指へ縦、を目安に実線をなぞる。",
   "線が見えない/absent の場合、その線の points は空配列にする。推測で描かない。",
 ].join("\n");
+
+const HAND_LABEL: Record<string, string> = { right: "右手", left: "左手" };
 
 export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -101,7 +105,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "no_api_key" }, { status: 503 });
   }
 
-  let body: { image?: unknown };
+  let body: { image?: unknown; hand?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -111,6 +115,7 @@ export async function POST(req: Request) {
   if (typeof image !== "string" || !image) {
     return Response.json({ error: "no_image" }, { status: 400 });
   }
+  const handLabel = typeof body.hand === "string" ? HAND_LABEL[body.hand] : undefined;
 
   // dataURL から media_type と base64 を取り出す
   const m = image.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);
@@ -137,7 +142,9 @@ export async function POST(req: Request) {
             { type: "image", source: { type: "base64", media_type: mediaType, data } },
             {
               type: "text",
-              text: "この手のひら画像から、7本の手相線の特徴量と位置(points)をスキーマ通りに抽出してください。",
+              text:
+                (handLabel ? `これは${handLabel}（手のひらをカメラに向けた状態）です。` : "") +
+                "この手のひら画像から、7本の手相線の特徴量と位置(points)をスキーマ通りに抽出してください。まず親指の位置から手の向きを見極めてください。",
             },
           ],
         },

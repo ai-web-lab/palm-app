@@ -121,8 +121,9 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("right");
   const [scanIdx, setScanIdx] = useState(0);
   const [captured, setCaptured] = useState<CapturedHand[]>([]);
-  // AI特徴量抽出（画像を外部APIへ送信）。同意したときだけ有効。
-  const [useAI, setUseAI] = useState(false);
+  // AI特徴量抽出（画像を外部APIへ送信）。推奨経路だが、外部送信のため
+  // 同意トグルは常に明示し、オフにすれば端末内処理に切り替わる。
+  const [useAI, setUseAI] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiFailed, setAiFailed] = useState(false);
 
@@ -152,7 +153,7 @@ export default function Home() {
         // 表示・検出・AI座標を同一基準にそろえるため、先にEXIF正規化した画像を使う。
         const norm = await normalizeImage(image);
         if (norm) img = norm.url;
-        const reading = await fetchAIReading(img);
+        const reading = await fetchAIReading(img, hand);
         features = reading.features;
         aiLines = reading.lines;
         source = "ai";
@@ -231,19 +232,26 @@ export default function Home() {
           </p>
           <OptionList opts={MODE_OPTS} value={mode} onChange={setMode} />
 
-          <label className="ai-consent">
-            <input
-              type="checkbox"
-              checked={useAI}
-              onChange={(e) => setUseAI(e.target.checked)}
-            />
-            <span>
-              <b>AIで手相を解析する（β）</b>
+          <div className="ai-pick">
+            <div className="ai-pick-head">
+              <b>読み取り方法</b>
+              <span className="ai-rec">AI解析が高精度（推奨）</span>
+            </div>
+            <label className="ai-consent" data-on={useAI}>
+              <input
+                type="checkbox"
+                checked={useAI}
+                onChange={(e) => setUseAI(e.target.checked)}
+              />
               <span>
-                画像を外部AI(Anthropic)に送信して線を読み取ります。チェックしない場合は端末内で完結（特徴量はモック）。
+                <b>AIで手相を読み取る（推奨・β）</b>
+                <span>
+                  画像を外部AI(Anthropic)に送信し、線の特徴を読み取って診断します。
+                  画像は診断のためだけに使い、保存しません。オフにすると端末内のみで処理します（簡易表示）。
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          </div>
 
           <div className="nav">
             <button className="btn ghost" onClick={() => setStep(0)}>
