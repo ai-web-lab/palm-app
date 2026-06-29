@@ -179,6 +179,28 @@ function smoothDownsample(pts: Pt[], out = 6): Pt[] {
 const mean = (a: number[]) => (a.length ? a.reduce((s, n) => s + n, 0) / a.length : 0);
 
 /**
+ * docs/08 校正(CFG)に基づく基本4線の「基準テンプレ点列」を画像なしで生成する。
+ * (u,v) パーム座標の expected 位置（生命線は lifeArc）に沿って全長で配置する。
+ * CV が低信頼のときに全線をここへフォールバックさせる用途。
+ * lmPx は画像ピクセル座標のランドマーク。返り値も画像ピクセル座標。
+ */
+export function baselineLines(lmPx: Pt[]): Partial<Record<LineKey, Pt[]>> {
+  const { P } = palmFrame(lmPx);
+  const out: Partial<Record<LineKey, Pt[]>> = {};
+  (Object.keys(CFG) as BaseLine[]).forEach((key) => {
+    const cfg = CFG[key];
+    const pts = cfg.along.map((a) => {
+      const e = cfg.expected(a);
+      const uu = cfg.searchAxis === "v" ? a : e;
+      const vv = cfg.searchAxis === "v" ? e : a;
+      return P(uu, vv);
+    });
+    out[key] = smoothDownsample(pts, 7);
+  });
+  return out;
+}
+
+/**
  * グレースケール配列から主要4線を抽出（純粋・テスト可能）。
  * lmPx は画像ピクセル座標のランドマーク。
  */

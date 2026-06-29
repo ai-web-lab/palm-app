@@ -11,7 +11,7 @@ import {
   primaryHand,
 } from "@/lib/diagnosis";
 import { detectHandLandmarks, normalizeImage } from "@/lib/handDetect";
-import { extractPalmLines } from "@/lib/lineExtraction";
+import { baselineLines, extractPalmLines } from "@/lib/lineExtraction";
 import {
   computeLinePoints,
   DEFAULT_LANDMARKS,
@@ -146,6 +146,14 @@ export default function ResultStep({
       const ai = mainHand.aiLines;
       // CVは正規化済みCanvas＋ランドマークが必要（座標は画像px＝gw×gh と同じ系）
       const cv = lm && norm ? extractPalmLines(norm.canvas, lm) : null;
+      // 基準テンプレ：docs/08校正の(u,v)位置に沿った全長の基本4線。CV低信頼時の全線フォールバック。
+      const lmPx = (lm ?? DEFAULT_LANDMARKS).map((p) => ({ x: p.x * gw, y: p.y * gh }));
+      const baseTpl = baselineLines(lmPx);
+
+      // CV全体の信頼性ゲート：基本4線のうち閾値を超えた本数が少なければCVは不採用とし、
+      // 全線を基準テンプレへ配置する（断片的な誤検出を出さない＝A. 全線フォールバック）。
+      const passCount = BASE4.filter((k) => (cv?.confidence[k] ?? 0) >= CV_THRESHOLD).length;
+      const cvReliable = !!cv && passCount >= 2;
 
       let usedAI = false;
       let usedCV = false;
@@ -155,7 +163,7 @@ export default function ResultStep({
         const cvPts = cv?.lines[key];
         const cvConf = cv?.confidence[key] ?? 0;
         const a = ai?.[key];
-        if (cvPts && cvPts.length >= 2 && cvConf >= CV_THRESHOLD) {
+        if (cvReliable && cvPts && cvPts.length >= 2 && cvConf >= CV_THRESHOLD) {
           base[key] = cvPts; // すでに画像px
           usedCV = true;
           if (BASE4.includes(key)) detKeys.push(key);
@@ -163,8 +171,12 @@ export default function ResultStep({
           base[key] = a.map((p) => ({ x: clamp01(p.x) * gw, y: clamp01(p.y) * gh }));
           usedAI = true;
           if (BASE4.includes(key)) detKeys.push(key);
+        } else if (baseTpl[key]) {
+          // 基本4線は常に基準テンプレで全長表示（ズレは「線を合わせる」で微調整）
+          base[key] = baseTpl[key]!;
+          if (BASE4.includes(key)) detKeys.push(key);
         } else {
-          base[key] = template[key];
+          base[key] = template[key]; // extra3 など（CV非対象）
         }
       }
       setDetected(detKeys);
@@ -184,7 +196,8 @@ export default function ResultStep({
           merged[key] = cv.features[key] ?? { presence: "absent" };
         }
         setEffFeatures(merged);
-        setDiagSource("cv");
+        // 低信頼時はCVの特徴で「診断した」と表示しない（特徴は standard 中心で決定論的）。
+        setDiagSource(cvReliable ? "cv" : "mock");
       } else {
         setEffFeatures(mainHand.features);
         setDiagSource("mock");
