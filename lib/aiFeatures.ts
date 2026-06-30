@@ -1,16 +1,14 @@
 import type { Features, Hand, LineKey } from "./types";
-import type { Pt } from "./palmLines";
 
 export type AIReading = {
   features: Record<LineKey, Features>;
-  /** 各線の正規化座標（0..1）。AIが推定した線の位置。無い線は空配列。 */
-  lines: Partial<Record<LineKey, Pt[]>>;
 };
 
 /**
- * LLM特徴量＋線位置の抽出。画像(dataURL)を /api/diagnose に送る。
- * hand を渡すと、AIが左右（親指の向き）を踏まえて線位置を推定できる。
+ * LLM特徴量の読み取り。画像(dataURL)を /api/diagnose に送る。
+ * hand を渡すと、AIが左右（親指の向き）を踏まえて読み取れる。
  * 失敗時は例外を投げる（呼び出し側でモックにフォールバック）。
+ * ※ 線の座標(なぞる=B)は廃止。特徴量(A)のみ取得する。
  */
 export async function fetchAIReading(
   imageDataUrl: string,
@@ -26,5 +24,5 @@ export async function fetchAIReading(
   }
   const data = (await res.json()) as Partial<AIReading>;
   if (!data.features) throw new Error("ai_reading_empty");
-  return { features: data.features, lines: data.lines ?? {} };
+  return { features: data.features };
 }

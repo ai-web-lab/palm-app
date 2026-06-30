@@ -145,17 +145,15 @@ export default function Home() {
     let img = image;
     let features = genMockFeatures();
     let source: CapturedHand["source"] = "mock";
-    let aiLines: CapturedHand["aiLines"];
 
     if (useAI) {
       setAnalyzing(true);
       try {
-        // 表示・検出・AI座標を同一基準にそろえるため、先にEXIF正規化した画像を使う。
+        // 表示とAI入力の向きをそろえるため、先にEXIF正規化した画像を使う。
         const norm = await normalizeImage(image);
         if (norm) img = norm.url;
         const reading = await fetchAIReading(img, hand);
         features = reading.features;
-        aiLines = reading.lines;
         source = "ai";
       } catch {
         // 失敗時はモックにフォールバックし、結果画面で注記する。
@@ -167,7 +165,7 @@ export default function Home() {
 
     const next: CapturedHand[] = [
       ...captured,
-      { hand, image: img, features, source, aiLines },
+      { hand, image: img, features, source },
     ];
     setCaptured(next);
     if (scanIdx < scanQueue.length - 1) {
