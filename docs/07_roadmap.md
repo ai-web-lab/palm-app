@@ -24,12 +24,16 @@
 - [~] ~~MediaPipe で線を手に追従配置／実線抽出（②）／ドラッグ調整（③）~~
       → **B（線オーバーレイ）として停止**。`lib/handDetect.ts` `lib/palmLines.ts`
       `lib/lineExtraction.ts` は未使用で温存。結果画面の描画・「線を合わせる」は撤去。
-- [x] **（主役・β）LLM特徴量の読み取り**：画像を Claude Vision(`claude-opus-4-8`) に送り、
-      各線の特徴量だけを構造化出力で取得 → 診断へ（`app/api/diagnose` / `lib/aiFeatures.ts`）。
-      **AI解析を主役（既定ON・推奨）。** 外部送信のため同意トグルは常に明示し、オフ／失敗時は
-      モック（簡易）へフォールバック。座標(points)は要求しない＝読み取りに専念。
+- [x] **（オプトイン・β）LLM特徴量の読み取り**：画像を Claude Vision に送り、各線の特徴量だけを
+      構造化出力で取得 → 診断へ（`app/api/diagnose` / `lib/aiFeatures.ts`）。座標は要求しない。
+      **公開方針＝C（ハイブリッド）**：既定は端末内処理、AIは同意して選んだ人だけのオプトイン。
+      **コスト重視でモデルを `claude-sonnet-4-6` に変更**（既定。`ANTHROPIC_DIAGNOSE_MODEL` で
+      `claude-haiku-4-5` へ切替可）。thinking不使用でコスト・レイテンシ削減。将来は課金余地。
 - [x] **読み取り→判断の確定**：診断は特徴量のみで決まる（`diagnoseHand`）。結果画面は
       写真（線なし）＋特記のある線のチップ＋解説＋総合（`components/ResultStep.tsx`）。
+- [x] **知識ベースの拡充（AI非依存の品質底上げ）**：`palm_rules.json` の combos／advice を大幅追加、
+      抜けていた `slope=upward` のルールを補完。extra3線にも combos／advice を付与。
+      端末内（AI無し）でも読み応えのある診断が出るように。トーンは既存に合わせCLAUDE.md準拠。
 - [ ] 検出失敗時のUX（撮り直し誘導）※フォールバック表示は実装済み
 - [ ] 基本4線の領域抽出 → 線トレース（OpenCV.js）
 - [ ] 特徴量の量子化（length/curve/depth/slope/start_height）

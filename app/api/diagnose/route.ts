@@ -3,6 +3,10 @@ import Anthropic from "@anthropic-ai/sdk";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// 一般公開向けにコスト重視。既定は Sonnet 4.6（Opusより安価で視覚も十分）。
+// さらに安くしたい場合は環境変数 ANTHROPIC_DIAGNOSE_MODEL=claude-haiku-4-5 に切替。
+const MODEL = process.env.ANTHROPIC_DIAGNOSE_MODEL || "claude-sonnet-4-6";
+
 /**
  * LLM特徴量抽出。
  * 手のひら画像を Claude Vision に渡し、「線の特徴量」だけを構造化出力で受け取る。
@@ -111,10 +115,11 @@ export async function POST(req: Request) {
   const client = new Anthropic({ apiKey });
 
   try {
+    // 特徴量の読み取りは重い推論を要さないため thinking は付けない
+    // （コスト・レイテンシ削減、Haiku互換）。構造化出力でスキーマを担保する。
     const res = await client.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 4000,
-      thinking: { type: "adaptive" },
+      model: MODEL,
+      max_tokens: 1500,
       system: SYSTEM,
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [
