@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import CaptureStep from "@/components/CaptureStep";
 import ResultStep from "@/components/ResultStep";
-import { fetchAIReading } from "@/lib/aiFeatures";
 import { genMockFeatures } from "@/lib/diagnosis";
-import { normalizeImage } from "@/lib/handDetect";
 import type { CapturedHand, Hand, Mode } from "@/lib/types";
 
 type OptionDef<T extends string> = {
@@ -121,11 +119,6 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("right");
   const [scanIdx, setScanIdx] = useState(0);
   const [captured, setCaptured] = useState<CapturedHand[]>([]);
-  // AI特徴量抽出（画像を外部APIへ送信）。推奨経路だが、外部送信のため
-  // 同意トグルは常に明示し、オフにすれば端末内処理に切り替わる。
-  const [useAI, setUseAI] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [aiFailed, setAiFailed] = useState(false);
 
   const scanQueue: Hand[] = mode === "both" ? ["right", "left"] : [mode];
 
@@ -136,36 +129,15 @@ export default function Home() {
   const startCapture = () => {
     setScanIdx(0);
     setCaptured([]);
-    setAiFailed(false);
     setStep(2);
   };
 
-  const handleComplete = async (image: string) => {
+  // 手相判定は端末内で完結（知識ベース）。撮影画像は保存せずメモリ上で扱う。
+  const handleComplete = (image: string) => {
     const hand = scanQueue[scanIdx];
-    let img = image;
-    let features = genMockFeatures();
-    let source: CapturedHand["source"] = "mock";
-
-    if (useAI) {
-      setAnalyzing(true);
-      try {
-        // 表示とAI入力の向きをそろえるため、先にEXIF正規化した画像を使う。
-        const norm = await normalizeImage(image);
-        if (norm) img = norm.url;
-        const reading = await fetchAIReading(img, hand);
-        features = reading.features;
-        source = "ai";
-      } catch {
-        // 失敗時はモックにフォールバックし、結果画面で注記する。
-        setAiFailed(true);
-      } finally {
-        setAnalyzing(false);
-      }
-    }
-
     const next: CapturedHand[] = [
       ...captured,
-      { hand, image: img, features, source },
+      { hand, image, features: genMockFeatures(), source: "mock" },
     ];
     setCaptured(next);
     if (scanIdx < scanQueue.length - 1) {
@@ -180,7 +152,6 @@ export default function Home() {
     setMode("right");
     setScanIdx(0);
     setCaptured([]);
-    setAiFailed(false);
     setStep(0);
   };
 
@@ -230,26 +201,9 @@ export default function Home() {
           </p>
           <OptionList opts={MODE_OPTS} value={mode} onChange={setMode} />
 
-          <div className="ai-pick">
-            <div className="ai-pick-head">
-              <b>読み取り方法</b>
-              <span className="ai-rec">AI解析が高精度（推奨）</span>
-            </div>
-            <label className="ai-consent" data-on={useAI}>
-              <input
-                type="checkbox"
-                checked={useAI}
-                onChange={(e) => setUseAI(e.target.checked)}
-              />
-              <span>
-                <b>AIで手相を読み取る（推奨・β）</b>
-                <span>
-                  画像を外部AI(Anthropic)に送信し、線の特徴を読み取って診断します。
-                  画像は診断のためだけに使い、保存しません。オフにすると端末内のみで処理します（簡易表示）。
-                </span>
-              </span>
-            </label>
-          </div>
+          <p className="sub" style={{ marginTop: 14 }}>
+            ※ 手相の読み取り・診断は端末内で行います。画像を外部に送信・保存することはありません。
+          </p>
 
           <div className="nav">
             <button className="btn ghost" onClick={() => setStep(0)}>
@@ -279,19 +233,9 @@ export default function Home() {
           handedness={handedness}
           mode={mode}
           captured={captured}
-          aiFailed={aiFailed}
           onRestart={restart}
           onRecapture={startCapture}
         />
-      )}
-
-      {analyzing && (
-        <div className="analyzing-overlay">
-          <div className="analyzing-box">
-            <div className="spinner" />
-            AIが手相を解析しています…
-          </div>
-        </div>
       )}
     </div>
   );

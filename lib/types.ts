@@ -13,8 +13,8 @@ export type Mode = "left" | "right" | "both";
 /** 線ごとの特徴量。値は enum 文字列（length="long" 等）。standard は診断文を出さない。 */
 export type Features = Record<string, string>;
 
-/** 特徴量の出所。ai=LLM抽出 / mock=ランダム生成。 */
-export type FeatureSource = "ai" | "mock";
+/** 特徴量の出所。現状は端末内の mock（撮影イメージによる娯楽診断）のみ。 */
+export type FeatureSource = "mock";
 
 /** 手1枚分の入力。image は dataURL（撮影 or アップロードした実画像）。 */
 export interface CapturedHand {

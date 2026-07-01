@@ -24,13 +24,13 @@
 - [~] ~~MediaPipe で線を手に追従配置／実線抽出（②）／ドラッグ調整（③）~~
       → **B（線オーバーレイ）として停止**。`lib/handDetect.ts` `lib/palmLines.ts`
       `lib/lineExtraction.ts` は未使用で温存。結果画面の描画・「線を合わせる」は撤去。
-- [x] **（オプトイン・β）LLM特徴量の読み取り**：画像を Claude Vision に送り、各線の特徴量だけを
-      構造化出力で取得 → 診断へ（`app/api/diagnose` / `lib/aiFeatures.ts`）。座標は要求しない。
-      **公開方針＝C（ハイブリッド）**：既定は端末内処理、AIは同意して選んだ人だけのオプトイン。
-      **コスト重視でモデルを `claude-sonnet-4-6` に変更**（既定。`ANTHROPIC_DIAGNOSE_MODEL` で
-      `claude-haiku-4-5` へ切替可）。thinking不使用でコスト・レイテンシ削減。将来は課金余地。
-- [x] **読み取り→判断の確定**：診断は特徴量のみで決まる（`diagnoseHand`）。結果画面は
-      写真（線なし）＋特記のある線のチップ＋解説＋総合（`components/ResultStep.tsx`）。
+- [~] ~~LLM特徴量の読み取り（Claude Vision / `app/api/diagnose` / `lib/aiFeatures.ts`）~~
+      → **AI利用の手相判定は撤去**。API Route・`aiFeatures`・`@anthropic-ai/sdk` 依存・
+      `.env(ANTHROPIC_API_KEY)` を削除。**画像を外部送信しない＝完全に端末内で完結**（公開時の
+      プライバシー負担・APIコスト・オンライン依存を回避）。将来必要になれば git 履歴から復活可。
+- [x] **読み取り→判断の確定（端末内のみ）**：診断は特徴量のみで決まる（`diagnoseHand`）。
+      結果画面は写真（線なし）＋特記のある線のチップ＋解説＋総合（`components/ResultStep.tsx`）。
+      ※ 現状の特徴量は撮影イメージによる簡易生成（`genMockFeatures`）。「娯楽診断」を明示する。
 - [x] **知識ベースの拡充（AI非依存の品質底上げ）**：`palm_rules.json` の combos／advice を大幅追加、
       抜けていた `slope=upward` のルールを補完。extra3線にも combos／advice を付与。
       端末内（AI無し）でも読み応えのある診断が出るように。トーンは既存に合わせCLAUDE.md準拠。
