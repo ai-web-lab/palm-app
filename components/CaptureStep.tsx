@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import leftGuide from "@/item/left.png";
-import rightGuide from "@/item/right.png";
 import type { Hand } from "@/lib/types";
 
 type Tab = "camera" | "upload";
@@ -37,8 +35,6 @@ export default function CaptureStep({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handLabel = hand === "right" ? "右手" : "左手";
-  // 撮影ガイド画像（添付イラスト）。右手/左手それぞれ専用の絵を使う。
-  const guideSrc = hand === "right" ? rightGuide.src : leftGuide.src;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -130,8 +126,8 @@ export default function CaptureStep({
       </h2>
       <p className="sub">
         {total > 1
-          ? `${isFirst ? "まず" : "続いて"}${handLabel}を。枠の中に手のひらを収めて取り込んでください。`
-          : `枠の中に${handLabel}のひらを収めて取り込んでください。`}
+          ? `${isFirst ? "まず" : "続いて"}${handLabel}を。手のひらを正面に向け、指を軽く開いて大きく写してください。`
+          : `${handLabel}のひらを正面に向け、指を軽く開いて画面に大きく写してください。`}
       </p>
 
       <div className="tabs" role="tablist">
@@ -166,6 +162,7 @@ export default function CaptureStep({
             <video ref={videoRef} playsInline muted />
           )}
           {shot && <img className="shot" src={shot} alt="取り込んだ手の画像" />}
+          {/* 手形ガイドは廃止（合わせづらいため）。手を自動検出するので厳密な位置合わせは不要。 */}
 
           {/* アップロードタブ・未選択時のドロップゾーン */}
           {tab === "upload" && !shot && (
@@ -197,11 +194,6 @@ export default function CaptureStep({
             </div>
           )}
 
-          {/* 撮影ガイド（添付イラスト）。カメラ起動中・未撮影のときに重ねる。 */}
-          {tab === "camera" && !shot && !scanning && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="guide-img" src={guideSrc} alt="" aria-hidden="true" />
-          )}
         </div>
 
         <div className="scan-hint">

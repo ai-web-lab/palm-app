@@ -153,14 +153,23 @@ export default function ResultStep({
       let best: { line: LineKey; conf: number } | null = null;
       for (const k of BASE4) {
         const conf = cv?.confidence[k] ?? 0;
-        if (conf >= MEASURE_MIN) {
-          detKeys.push(k);
+        const measured = conf >= MEASURE_MIN;
+        if (measured) {
           const depth = cv?.features[k]?.depth;
           if (depth) feats[k] = { ...feats[k], depth };
-          if (k === "fate_line") feats[k] = { ...feats[k], presence: "present" };
           if (!best || conf > best.conf) best = { line: k, conf };
-        } else if (k === "fate_line") {
-          feats[k] = { presence: "absent" };
+        }
+        if (k === "fate_line") {
+          // 運命線は無い人もいる：実測できたときだけ present＆表示。
+          if (measured) {
+            feats[k] = { ...feats[k], presence: "present" };
+            detKeys.push(k);
+          } else {
+            feats[k] = { presence: "absent" };
+          }
+        } else {
+          // 生命線・知能線・感情線は誰にでもある：手が検出できたら必ず表示（普通でも解説）。
+          detKeys.push(k);
         }
       }
       setEffFeatures(feats);
@@ -187,7 +196,7 @@ export default function ResultStep({
           {shown.length > 0 ? (
             <>
               あなたの手から<b>{shown.length}本</b>
-              の特徴的な手相を読み取りました。気になる線を選ぶと解説が見られます。
+              の手相を読み取りました。気になる線を選ぶと解説が見られます。
             </>
           ) : (
             <>大きなクセは控えめ。全体のバランスから読み解きます。</>
@@ -273,7 +282,8 @@ export default function ResultStep({
               sel.texts.map((t, i) => <li key={i}>{t}</li>)
             ) : combo ? null : (
               <li>
-                目立ったクセは控えめで、バランスのとれた{sel.def.theme}の持ち主です。
+                {(sel.def.standard_text as string | undefined) ??
+                  `目立ったクセは控えめで、バランスのとれた${sel.def.theme}の持ち主です。`}
               </li>
             )}
           </ul>

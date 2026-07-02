@@ -156,6 +156,7 @@
     "life_line": {
       "name_ja": "生命線",
       "theme": "生命力・健康・バイタリティ",
+      "standard_text": "生命線は標準的な張りと濃さ。過不足のない安定した生命力で、日々を無理なく過ごせるバランス型です。",
       "mvp_features": ["length", "curve", "depth"],
       "advanced_features": ["continuity"],
       "rules": [
@@ -188,6 +189,7 @@
     "head_line": {
       "name_ja": "知能線（頭脳線）",
       "theme": "思考タイプ・才能・適性",
+      "standard_text": "知能線は標準的なバランス。現実的な思考と柔軟さを併せ持ち、場面に応じて考え方を切り替えられます。",
       "mvp_features": ["slope", "length"],
       "advanced_features": ["branching", "start_origin"],
       "rules": [
@@ -220,6 +222,7 @@
     "heart_line": {
       "name_ja": "感情線",
       "theme": "感情・愛情・対人関係",
+      "standard_text": "感情線は標準的な出方。感情表現と冷静さのバランスがよく、人との距離感を心地よく保てます。",
       "mvp_features": ["length", "start_height", "depth"],
       "advanced_features": ["branching"],
       "rules": [
@@ -252,6 +255,7 @@
     "fate_line": {
       "name_ja": "運命線",
       "theme": "仕事運・人生の流れ・社会での活躍",
+      "standard_text": "運命線は標準的な流れ。自分のペースで着実に道を歩んでいけるタイプです。",
       "note": "個人差が最も大きい線。ない場合も異常ではない。流年法で時期も読める。",
       "mvp_features": ["presence", "length", "depth"],
       "advanced_features": ["start_origin", "continuity"],
