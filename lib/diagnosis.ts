@@ -105,11 +105,11 @@ export function primaryHand(mode: Mode, handedness: Hand): Hand {
   return handedness;
 }
 
-/** 各手の時間軸ラベル（左右で固定。流派で変えない）。 */
+/** 各手の時間軸ラベル（利き手＝後天運、反対の手＝先天運。流派で意味は変えない）。 */
 export function axisFor(hand: Hand, handedness: Hand): string {
   return hand === handedness
-    ? "後天運 ・ いまのあなた"
-    : "先天運 ・ 生まれ持った本質";
+    ? "利き手（後天運）・ いま〜これからのあなた"
+    : "反対の手（先天運）・ 生まれ持った本質";
 }
 
 /** 総合サマリー。基本4線のうち1つを取り上げる。 */
@@ -122,14 +122,22 @@ export function overall(diag: LineResult[]): string {
   return `いまのあなたは「${pick.def.theme}」が特に表れています。${pick.texts[0]}`;
 }
 
-/** 左右差（両手モード）。後フェーズの簡易版。 */
-export function diffText(): string {
-  const opts = [
-    "生まれ持った素質を、努力でうまく活かしてきたタイプ。経験を重ねて成長しています。",
-    "生まれ持った運勢と今の生き方が一致。自分らしく無理のない歩み方ができています。",
-    "先天的なものと今の自分にギャップがあり、人生に変化や波が起こりやすい時期です。",
-  ];
-  return opts[Math.floor(Math.random() * opts.length)];
+/**
+ * 左右差の読み（両手モード）。左＝先天運（生まれ持った本質）／右＝後天運（歩んできた自分）。
+ * 手型(landmark実測)の一致/相違で読みを変える。sameType=null は測定不能（一般解説）。
+ */
+export function leftRightReading(sameType: boolean | null): string {
+  const lr = (
+    RULES.hand_policy as
+      | { left_right_diff?: { rules?: { id: string; interpretation: string }[] } }
+      | undefined
+  )?.left_right_diff?.rules;
+  const byId = (id: string) => lr?.find((r) => r.id === id)?.interpretation ?? "";
+  const lead =
+    "左手は生まれ持った素質（先天運・本音の自分）、右手は歩んできた生き方（後天運・いまの自分）を表します。同じ線を左右で見比べるのが両手占いの醍醐味です。";
+  if (sameType === true) return `${lead}\n${byId("diff_similar")}`;
+  if (sameType === false) return `${lead}\n${byId("diff_large")}`;
+  return `${lead}\n左右の差が大きいほど「生まれ持った自分」と「今の自分」の伸びしろ、小さいほど自分らしさを貫けているサインです。`;
 }
 
 // ───────────────────────────────────────────────────────────────────

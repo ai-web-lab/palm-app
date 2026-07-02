@@ -55,7 +55,7 @@ const MODE_OPTS: OptionDef<Mode>[] = [
   {
     v: "right",
     title: "右手",
-    desc: "いまの自分・これからを見る（手軽）",
+    desc: "後天運：いま〜これからの自分（手軽）",
     icon: (
       <>
         <rect x="5" y="3" width="14" height="18" rx="3" stroke="#9aa2c8" strokeWidth="1.6" />
@@ -66,7 +66,7 @@ const MODE_OPTS: OptionDef<Mode>[] = [
   {
     v: "left",
     title: "左手",
-    desc: "生まれ持った本質・素質を見る",
+    desc: "先天運：生まれ持った本質・素質",
     icon: (
       <>
         <rect x="5" y="3" width="14" height="18" rx="3" stroke="#9aa2c8" strokeWidth="1.6" />
@@ -77,7 +77,7 @@ const MODE_OPTS: OptionDef<Mode>[] = [
   {
     v: "both",
     title: "両手",
-    desc: "本式・右手と左手を1枚ずつ撮影",
+    desc: "左右を見比べ、先天と後天の違いを読む",
     icon: (
       <>
         <rect x="2" y="4" width="9" height="16" rx="2.5" stroke="#9aa2c8" strokeWidth="1.6" />
@@ -184,7 +184,7 @@ export default function Home() {
         <section className="card">
           <h2>あなたの利き手は？</h2>
           <p className="sub">
-            利き手を「いまのあなた」、反対の手を「生まれ持った本質」として読み解きます。
+            利き手＝後天運（いま〜これからの自分）、反対の手＝先天運（生まれ持った本質）として読み解きます。
           </p>
           <OptionList
             opts={HANDEDNESS_OPTS}
@@ -203,7 +203,7 @@ export default function Home() {
         <section className="card">
           <h2>どの手を占いますか？</h2>
           <p className="sub">
-            片手だけでも占えます。両手だと「生まれ持った自分」と「いまの自分」の違いも読めます。
+            片手でも占えます。両手だと、左手（生まれ持った自分）と右手（今の自分）を見比べて、成長や伸びしろも読めます。
           </p>
           <OptionList opts={MODE_OPTS} value={mode} onChange={setMode} />
 

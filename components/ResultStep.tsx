@@ -6,7 +6,7 @@ import {
   axisFor,
   comboFor,
   diagnoseHand,
-  diffText,
+  leftRightReading,
   overall,
   primaryHand,
   readFingers,
@@ -80,15 +80,10 @@ export default function ResultStep({
   const [detected, setDetected] = useState<LineKey[]>([]);
 
   // 診断＝特徴量の読み取りから組み立てる（線の座標は使わない）。
-  const { diag, summary, diff } = useMemo(() => {
+  const { diag, summary } = useMemo(() => {
     const d = diagnoseHand(effFeatures).filter((r) => !r.absent);
-    return {
-      diag: d,
-      summary: overall(d),
-      diff: mode === "both" ? diffText() : null,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effFeatures, mode]);
+    return { diag: d, summary: overall(d) };
+  }, [effFeatures]);
 
   // 表示する線＝「特記のある線(diag)」∪「はっきり検出できた基本線(detected)」。
   // 検出できていれば、濃さが普通でも空カード（バランス型の一言）を出して一貫性を保つ。
@@ -182,6 +177,42 @@ export default function ResultStep({
       cancelled = true;
     };
   }, [mainHand.image]);
+
+  // 両手モード：左右それぞれの手型を実測し、「先天(左)と後天(右)」の違いを読む。
+  const [diffReading, setDiffReading] = useState<string | null>(null);
+  useEffect(() => {
+    if (mode !== "both") {
+      setDiffReading(null);
+      return;
+    }
+    const right = captured.find((h) => h.hand === "right");
+    const left = captured.find((h) => h.hand === "left");
+    if (!right || !left) {
+      setDiffReading(null);
+      return;
+    }
+    let cancelled = false;
+    const typeOf = async (image: string): Promise<string | null> => {
+      const norm = await normalizeImage(image);
+      if (!norm) return null;
+      const lm = await detectHandLandmarks(norm.canvas);
+      if (!lm) return null;
+      const lmPx = lm.map((p) => ({ x: p.x * norm.width, y: p.y * norm.height }));
+      return computeHandMetrics(lmPx)?.handType ?? null;
+    };
+    (async () => {
+      const [tL, tR] = await Promise.all([
+        typeOf(left.image),
+        typeOf(right.image),
+      ]);
+      if (cancelled) return;
+      const same = tL && tR ? tL === tR : null;
+      setDiffReading(leftRightReading(same));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, captured]);
 
   const sel = shown.find((r) => r.line === selected) || null;
   const combo = sel ? comboFor(sel.def, sel.feats) : null;
@@ -306,10 +337,10 @@ export default function ResultStep({
         <h3>総合</h3>
         <p>{summary}</p>
       </div>
-      {diff && (
+      {diffReading && (
         <div className="summary">
-          <h3>左右のちがい</h3>
-          <p>{diff}</p>
+          <h3>左右のちがい（先天と後天）</h3>
+          <p style={{ whiteSpace: "pre-line" }}>{diffReading}</p>
         </div>
       )}
 
