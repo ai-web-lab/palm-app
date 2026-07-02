@@ -204,6 +204,32 @@ header.top {
   background: #121a3d;
   border-color: var(--gold);
 }
+
+.handtype {
+  max-width: 520px;
+  margin: 4px auto 16px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, #141b3d, #0e1330);
+  border: 1px solid var(--gold);
+  border-radius: 15px;
+  text-align: center;
+}
+.ht-badge {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+.handtype p {
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.75;
+  margin: 0 0 10px;
+}
+.handtype .advice {
+  text-align: left;
+}
 .ai-consent input {
   margin-top: 3px;
   width: 17px;

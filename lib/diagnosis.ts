@@ -1,5 +1,45 @@
 import { RULES, LINE_ORDER, isExtra } from "./rules";
+import type { HandMetrics } from "./handMetrics";
 import type { Features, Hand, LineDef, LineKey, LineResult, Mode } from "./types";
+
+/** 手型の定義（palm_rules.json hand_types）。 */
+export type HandTypeReading = {
+  name_ja: string;
+  theme: string;
+  text: string;
+  advice?: string;
+};
+
+/** 手型を読む（landmark実測 → 文言）。確信度が低い/判定不能なら null。 */
+export function readHandType(m: HandMetrics | null): HandTypeReading | null {
+  if (!m || !m.handType || m.confidence < 0.4) return null;
+  const table = RULES.hand_types as
+    | Record<string, HandTypeReading>
+    | undefined;
+  return table?.[m.handType] ?? null;
+}
+
+/** 指の特徴を読む（確実な信号のみ・複数可）。 */
+export function readFingers(m: HandMetrics | null): string[] {
+  if (!m || m.confidence < 0.4) return [];
+  const f = RULES.fingers as
+    | {
+        overall?: Record<string, string>;
+        index_vs_ring?: Record<string, string>;
+        pinky?: Record<string, string>;
+      }
+    | undefined;
+  if (!f) return [];
+  const out: string[] = [];
+  if (m.fingersOverall !== "standard" && f.overall?.[m.fingersOverall]) {
+    out.push(f.overall[m.fingersOverall]);
+  }
+  if (m.indexVsRing !== "even" && f.index_vs_ring?.[m.indexVsRing]) {
+    out.push(f.index_vs_ring[m.indexVsRing]);
+  }
+  if (m.pinkyLong && f.pinky?.long) out.push(f.pinky.long);
+  return out;
+}
 
 /**
  * 診断ロジック（純粋関数）。文言は一切持たず、palm_rules.json を引くだけ。

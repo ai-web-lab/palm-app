@@ -34,6 +34,13 @@
 - [x] **知識ベースの拡充（AI非依存の品質底上げ）**：`palm_rules.json` の combos／advice を大幅追加、
       抜けていた `slope=upward` のルールを補完。extra3線にも combos／advice を付与。
       端末内（AI無し）でも読み応えのある診断が出るように。トーンは既存に合わせCLAUDE.md準拠。
+- [x] **A：手型・指の特徴を実測**（docs/09）：MediaPipe 21点から手型（四大分類）と指の特徴を測る
+      `lib/handMetrics.ts`（純粋関数・単体テスト済）。相対比較（人差し指vs薬指／小指vs薬指関節）は
+      pose不変で確実。`readHandType`/`readFingers`（`lib/diagnosis.ts`）で `palm_rules.json` の
+      `hand_types`/`fingers` を引く。`ResultStep` に手型の見出し＋指の補足を表示。
+      確信度<0.4／未検出は表示しない（＝当てずっぽうを出さない）。※閾値は実写で要較正。
+- [ ] **B：基本4線の「濃さ・presence・目立ち度」を実測**（`extractFromGray`流用、座標は使わない）
+      → 線の depth/presence をモックから実測へ。次段。
 - [ ] 検出失敗時のUX（撮り直し誘導）※フォールバック表示は実装済み
 - [ ] 基本4線の領域抽出 → 線トレース（OpenCV.js）
 - [ ] 特徴量の量子化（length/curve/depth/slope/start_height）

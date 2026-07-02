@@ -9,8 +9,12 @@ import {
   diffText,
   overall,
   primaryHand,
+  readFingers,
+  readHandType,
+  type HandTypeReading,
 } from "@/lib/diagnosis";
-import { normalizeImage } from "@/lib/handDetect";
+import { detectHandLandmarks, normalizeImage } from "@/lib/handDetect";
+import { computeHandMetrics } from "@/lib/handMetrics";
 import { LINE_COLOR, LINE_ORDER, isExtra } from "@/lib/rules";
 import type { CapturedHand, Hand, LineKey, LineResult, Mode } from "@/lib/types";
 
@@ -68,13 +72,25 @@ export default function ResultStep({
   }, [shown]);
 
   // 写真は向きだけ正規化して表示（線は重ねない）。
+  // あわせて手のランドマークから「手型・指の特徴」を実測（A：AIなしの正直な読み）。
   const [displayUrl, setDisplayUrl] = useState(mainHand.image);
+  const [handType, setHandType] = useState<HandTypeReading | null>(null);
+  const [fingerNotes, setFingerNotes] = useState<string[]>([]);
   useEffect(() => {
     let cancelled = false;
     setDisplayUrl(mainHand.image);
+    setHandType(null);
+    setFingerNotes([]);
     (async () => {
       const norm = await normalizeImage(mainHand.image);
-      if (!cancelled && norm) setDisplayUrl(norm.url);
+      if (cancelled || !norm) return;
+      setDisplayUrl(norm.url);
+      const lm = await detectHandLandmarks(norm.canvas);
+      if (cancelled || !lm) return;
+      const lmPx = lm.map((p) => ({ x: p.x * norm.width, y: p.y * norm.height }));
+      const m = computeHandMetrics(lmPx);
+      setHandType(readHandType(m));
+      setFingerNotes(readFingers(m));
     })();
     return () => {
       cancelled = true;
@@ -101,6 +117,20 @@ export default function ResultStep({
           )}
         </p>
       </div>
+
+      {/* 手型（手のかたち×指の長さ。ランドマーク実測＝正直な読み） */}
+      {handType && (
+        <div className="handtype">
+          <div className="ht-badge">あなたは〈{handType.name_ja}〉タイプ</div>
+          <p>{handType.text}</p>
+          {handType.advice && (
+            <div className="advice">
+              <span className="atag">ひとこと</span>
+              {handType.advice}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 取り込んだ写真（線オーバーレイは廃止） */}
       <div className="photo-wrap">
@@ -156,6 +186,18 @@ export default function ResultStep({
               {advice.join(" ")}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 指から見るあなた（相対比較は pose 不変で確実） */}
+      {fingerNotes.length > 0 && (
+        <div className="summary">
+          <h3>指から見るあなた</h3>
+          <ul>
+            {fingerNotes.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
         </div>
       )}
 
