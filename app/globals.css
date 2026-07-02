@@ -226,9 +226,24 @@ header.top {
   font-size: 13.5px;
   line-height: 1.75;
   margin: 0 0 10px;
+  text-align: left;
+}
+.handtype .finger-notes {
+  text-align: left;
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+.handtype .finger-notes li {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 4px;
 }
 .handtype .advice {
   text-align: left;
+}
+.lines-block {
+  margin-bottom: 4px;
 }
 
 .prominent-line {

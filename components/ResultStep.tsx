@@ -76,6 +76,8 @@ export default function ResultStep({
   const [prominent, setProminent] = useState<{ line: LineKey; name: string } | null>(
     null,
   );
+  // 実測でしっかり検出できた基本線（＝はっきり出ている線）。解説カードを必ず出す。
+  const [detected, setDetected] = useState<LineKey[]>([]);
 
   // 診断＝特徴量の読み取りから組み立てる（線の座標は使わない）。
   const { diag, summary, diff } = useMemo(() => {
@@ -88,11 +90,26 @@ export default function ResultStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effFeatures, mode]);
 
-  // 表示する線＝特記のある線（standard は出さない＝当たり障りない文で埋めない）。
+  // 表示する線＝「特記のある線(diag)」∪「はっきり検出できた基本線(detected)」。
+  // 検出できていれば、濃さが普通でも空カード（バランス型の一言）を出して一貫性を保つ。
   const shown: LineResult[] = useMemo(() => {
     const byLine = new Map(diag.map((r) => [r.line, r]));
-    return LINE_ORDER.map((k) => byLine.get(k)).filter(Boolean) as LineResult[];
-  }, [diag]);
+    const list: LineResult[] = [];
+    for (const k of LINE_ORDER) {
+      const r = byLine.get(k);
+      if (r) list.push(r);
+      else if (detected.includes(k)) {
+        list.push({
+          line: k,
+          def: RULES.lines[k],
+          feats: effFeatures[k] ?? {},
+          texts: [],
+          absent: false,
+        });
+      }
+    }
+    return list;
+  }, [diag, detected, effFeatures]);
 
   const [selected, setSelected] = useState<LineKey | null>(null);
   useEffect(() => {
@@ -113,6 +130,7 @@ export default function ResultStep({
     setFingerNotes([]);
     setEffFeatures(baselineFeatures());
     setProminent(null);
+    setDetected([]);
     (async () => {
       const norm = await normalizeImage(mainHand.image);
       if (cancelled || !norm) return;
@@ -131,10 +149,12 @@ export default function ResultStep({
       const cv = extractPalmLines(norm.canvas, lm);
       if (cancelled) return;
       const feats = baselineFeatures();
+      const detKeys: LineKey[] = [];
       let best: { line: LineKey; conf: number } | null = null;
       for (const k of BASE4) {
         const conf = cv?.confidence[k] ?? 0;
         if (conf >= MEASURE_MIN) {
+          detKeys.push(k);
           const depth = cv?.features[k]?.depth;
           if (depth) feats[k] = { ...feats[k], depth };
           if (k === "fate_line") feats[k] = { ...feats[k], presence: "present" };
@@ -144,6 +164,7 @@ export default function ResultStep({
         }
       }
       setEffFeatures(feats);
+      setDetected(detKeys);
       setProminent(
         best ? { line: best.line, name: RULES.lines[best.line].name_ja } : null,
       );
@@ -174,12 +195,28 @@ export default function ResultStep({
         </p>
       </div>
 
-      {/* 手型（手のかたち×指の長さ。ランドマーク実測＝正直な読み） */}
-      {handType && (
+      {/* 取り込んだ写真（線オーバーレイは廃止）。上部に集約してテキストの流れを分断しない。 */}
+      <div className="photo-wrap">
+        <img className="photo" src={displayUrl} alt="あなたの手" />
+      </div>
+
+      {/* あなたの手のかたち（手型＋指。ランドマーク実測＝確実な読み。1ブロックに集約） */}
+      {(handType || fingerNotes.length > 0) && (
         <div className="handtype">
-          <div className="ht-badge">あなたは〈{handType.name_ja}〉タイプ</div>
-          <p>{handType.text}</p>
-          {handType.advice && (
+          {handType && (
+            <>
+              <div className="ht-badge">あなたは〈{handType.name_ja}〉タイプ</div>
+              <p>{handType.text}</p>
+            </>
+          )}
+          {fingerNotes.length > 0 && (
+            <ul className="finger-notes">
+              {fingerNotes.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          )}
+          {handType?.advice && (
             <div className="advice">
               <span className="atag">ひとこと</span>
               {handType.advice}
@@ -188,36 +225,34 @@ export default function ResultStep({
         </div>
       )}
 
-      {/* いちばんはっきり出ている線（目立ち度の実測1位） */}
-      {prominent && (
-        <div className="prominent-line">
-          <span
-            className="pl-dot"
-            style={{ background: LINE_COLOR[prominent.line] }}
-          />
-          いちばんはっきり出ているのは〈{prominent.name}〉
-        </div>
-      )}
-
-      {/* 取り込んだ写真（線オーバーレイは廃止） */}
-      <div className="photo-wrap">
-        <img className="photo" src={displayUrl} alt="あなたの手" />
-      </div>
-
-      {/* 線チップ */}
+      {/* 手相線（目立ち度1位の見出し＋線チップ） */}
       {shown.length > 0 && (
-        <div className="linechips">
-          {shown.map((r) => (
-            <button
-              key={r.line}
-              className={"lchip" + (isExtra(r.def) ? " extra" : "")}
-              aria-pressed={selected === r.line}
-              onClick={() => setSelected(r.line)}
-            >
-              <span className="cdot" style={{ background: LINE_COLOR[r.line] }} />
-              {r.def.name_ja}
-            </button>
-          ))}
+        <div className="lines-block">
+          {prominent && (
+            <div className="prominent-line">
+              <span
+                className="pl-dot"
+                style={{ background: LINE_COLOR[prominent.line] }}
+              />
+              いちばんはっきり出ているのは〈{prominent.name}〉
+            </div>
+          )}
+          <div className="linechips">
+            {shown.map((r) => (
+              <button
+                key={r.line}
+                className={"lchip" + (isExtra(r.def) ? " extra" : "")}
+                aria-pressed={selected === r.line}
+                onClick={() => setSelected(r.line)}
+              >
+                <span
+                  className="cdot"
+                  style={{ background: LINE_COLOR[r.line] }}
+                />
+                {r.def.name_ja}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -253,18 +288,6 @@ export default function ResultStep({
               {advice.join(" ")}
             </div>
           )}
-        </div>
-      )}
-
-      {/* 指から見るあなた（相対比較は pose 不変で確実） */}
-      {fingerNotes.length > 0 && (
-        <div className="summary">
-          <h3>指から見るあなた</h3>
-          <ul>
-            {fingerNotes.map((t, i) => (
-              <li key={i}>{t}</li>
-            ))}
-          </ul>
         </div>
       )}
 
