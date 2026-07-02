@@ -34,8 +34,8 @@ import type {
 
 /** CVで濃さ/presenceを測る基本4線。 */
 const BASE4: LineKey[] = ["life_line", "head_line", "heart_line", "fate_line"];
-/** 実測を採用する目立ち度（confidence）のしきい値。テクスチャの誤検出を避けやや高め。 */
-const MEASURE_MIN = 0.5;
+/** 実測を採用する目立ち度（confidence）のしきい値。検出される線を少し増やすため緩和。 */
+const MEASURE_MIN = 0.4;
 
 /** 未測定の初期特徴量：基本4線は空(=standard)、extra3は absent（検出対象外を正直に）。 */
 function baselineFeatures(): Record<LineKey, Features> {
@@ -187,7 +187,7 @@ export default function ResultStep({
           {shown.length > 0 ? (
             <>
               あなたの手から<b>{shown.length}本</b>
-              の特徴的な手相を読み取りました。線をタップすると解説が見られます。
+              の特徴的な手相を読み取りました。気になる線を選ぶと解説が見られます。
             </>
           ) : (
             <>大きなクセは控えめ。全体のバランスから読み解きます。</>
