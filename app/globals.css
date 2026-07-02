@@ -246,6 +246,63 @@ header.top {
   margin-bottom: 4px;
 }
 
+.lr-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+.lr-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.lr-row:not(.lr-h):nth-child(odd) {
+  background: #0e1330;
+}
+.lr-h {
+  color: var(--muted);
+  font-size: 12px;
+}
+.lr-h small {
+  display: block;
+  font-size: 10px;
+  opacity: 0.8;
+}
+.lr-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+}
+.lr-name i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+}
+.lr-row span:nth-child(2),
+.lr-row span:nth-child(3) {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+}
+.lr-top {
+  color: var(--gold) !important;
+  font-weight: 700;
+}
+.lr-note {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.65;
+  margin-top: 8px;
+}
+
 .prominent-line {
   display: flex;
   align-items: center;

@@ -44,6 +44,20 @@ function baselineFeatures(): Record<LineKey, Features> {
   return f;
 }
 
+// 両手比較用：1手分の線の実測（濃さ・目立ち度）。
+type LineDepth = "dark" | "standard" | "faint" | null;
+type HandRead = {
+  handType: string | null;
+  prominent: LineKey | null;
+  lines: Record<string, { depth: LineDepth; conf: number }>;
+};
+const DEPTH_LABEL: Record<string, string> = {
+  dark: "濃い",
+  standard: "ふつう",
+  faint: "薄い",
+};
+const depthLabel = (d: LineDepth) => (d ? DEPTH_LABEL[d] : "—");
+
 interface Props {
   handedness: Hand;
   mode: Mode;
@@ -178,36 +192,58 @@ export default function ResultStep({
     };
   }, [mainHand.image]);
 
-  // 両手モード：左右それぞれの手型を実測し、「先天(左)と後天(右)」の違いを読む。
+  // 両手モード：左右それぞれの手型＋各線の濃さ・目立ち度を実測し、
+  // 「先天(左)と後天(右)」の違いの読みと、線くらべ表を作る。
   const [diffReading, setDiffReading] = useState<string | null>(null);
+  const [compare, setCompare] = useState<{ left: HandRead; right: HandRead } | null>(
+    null,
+  );
   useEffect(() => {
     if (mode !== "both") {
       setDiffReading(null);
+      setCompare(null);
       return;
     }
     const right = captured.find((h) => h.hand === "right");
     const left = captured.find((h) => h.hand === "left");
     if (!right || !left) {
       setDiffReading(null);
+      setCompare(null);
       return;
     }
     let cancelled = false;
-    const typeOf = async (image: string): Promise<string | null> => {
+    const measure = async (image: string): Promise<HandRead | null> => {
       const norm = await normalizeImage(image);
       if (!norm) return null;
       const lm = await detectHandLandmarks(norm.canvas);
       if (!lm) return null;
       const lmPx = lm.map((p) => ({ x: p.x * norm.width, y: p.y * norm.height }));
-      return computeHandMetrics(lmPx)?.handType ?? null;
+      const handType = computeHandMetrics(lmPx)?.handType ?? null;
+      const cv = extractPalmLines(norm.canvas, lm);
+      const lines: HandRead["lines"] = {};
+      let best: { line: LineKey; conf: number } | null = null;
+      for (const k of BASE4) {
+        const conf = cv?.confidence[k] ?? 0;
+        const depth =
+          conf >= MEASURE_MIN
+            ? ((cv?.features[k]?.depth as LineDepth) ?? "standard")
+            : null;
+        lines[k] = { depth, conf };
+        if (conf >= MEASURE_MIN && (!best || conf > best.conf)) {
+          best = { line: k, conf };
+        }
+      }
+      return { handType, prominent: best?.line ?? null, lines };
     };
     (async () => {
-      const [tL, tR] = await Promise.all([
-        typeOf(left.image),
-        typeOf(right.image),
+      const [L, R] = await Promise.all([
+        measure(left.image),
+        measure(right.image),
       ]);
       if (cancelled) return;
-      const same = tL && tR ? tL === tR : null;
+      const same = L?.handType && R?.handType ? L.handType === R.handType : null;
       setDiffReading(leftRightReading(same));
+      setCompare(L && R ? { left: L, right: R } : null);
     })();
     return () => {
       cancelled = true;
@@ -337,6 +373,43 @@ export default function ResultStep({
         <h3>総合</h3>
         <p>{summary}</p>
       </div>
+      {/* 左右の線くらべ（濃さ・目立ち度） */}
+      {compare && (
+        <div className="summary">
+          <h3>左右の線くらべ（濃さ）</h3>
+          <div className="lr-table">
+            <div className="lr-row lr-h">
+              <span />
+              <span>
+                左手<small>先天</small>
+              </span>
+              <span>
+                右手<small>後天</small>
+              </span>
+            </div>
+            {BASE4.map((k) => (
+              <div className="lr-row" key={k}>
+                <span className="lr-name">
+                  <i style={{ background: LINE_COLOR[k] }} />
+                  {RULES.lines[k].name_ja}
+                </span>
+                <span className={compare.left.prominent === k ? "lr-top" : ""}>
+                  {depthLabel(compare.left.lines[k]?.depth ?? null)}
+                  {compare.left.prominent === k ? " ★" : ""}
+                </span>
+                <span className={compare.right.prominent === k ? "lr-top" : ""}>
+                  {depthLabel(compare.right.lines[k]?.depth ?? null)}
+                  {compare.right.prominent === k ? " ★" : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="lr-note">
+            ★は各手でいちばんはっきり出ている線。左（先天）＝生まれ持った素質、右（後天）＝いまの生き方。「—」は今回はっきり読み取れなかった線です。
+          </p>
+        </div>
+      )}
+
       {diffReading && (
         <div className="summary">
           <h3>左右のちがい（先天と後天）</h3>
