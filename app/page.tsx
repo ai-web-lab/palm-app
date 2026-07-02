@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import CaptureStep from "@/components/CaptureStep";
 import ResultStep from "@/components/ResultStep";
-import { genMockFeatures } from "@/lib/diagnosis";
-import type { CapturedHand, Hand, Mode } from "@/lib/types";
+import { LINE_ORDER } from "@/lib/rules";
+import type { CapturedHand, Features, Hand, LineKey, Mode } from "@/lib/types";
+
+/** 未測定の空の特徴量。実測は結果画面(ResultStep)で行うため初期は空。 */
+const emptyFeatures = (): Record<LineKey, Features> =>
+  Object.fromEntries(LINE_ORDER.map((k) => [k, {} as Features])) as Record<
+    LineKey,
+    Features
+  >;
 
 type OptionDef<T extends string> = {
   v: T;
@@ -137,7 +144,7 @@ export default function Home() {
     const hand = scanQueue[scanIdx];
     const next: CapturedHand[] = [
       ...captured,
-      { hand, image, features: genMockFeatures(), source: "mock" },
+      { hand, image, features: emptyFeatures(), source: "mock" },
     ];
     setCaptured(next);
     if (scanIdx < scanQueue.length - 1) {

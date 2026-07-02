@@ -39,8 +39,11 @@
       pose不変で確実。`readHandType`/`readFingers`（`lib/diagnosis.ts`）で `palm_rules.json` の
       `hand_types`/`fingers` を引く。`ResultStep` に手型の見出し＋指の補足を表示。
       確信度<0.4／未検出は表示しない（＝当てずっぽうを出さない）。※閾値は実写で要較正。
-- [ ] **B：基本4線の「濃さ・presence・目立ち度」を実測**（`extractFromGray`流用、座標は使わない）
-      → 線の depth/presence をモックから実測へ。次段。
+- [x] **B：基本4線の「濃さ・presence・目立ち度」を実測**（`extractFromGray`流用、座標は使わない）。
+      `ResultStep` で confidence≥0.5 の線だけ depth を採用、運命線は presence を実測、
+      目立ち度1位を「いちばんはっきり出ている線」として見出しに。長さ・カーブ・傾き等の不安定な量は
+      使わず standard（断定しない）。**モック(ランダム)を廃止**し、未測定/低信頼は正直に穏やか表示。
+      `genMockFeatures` は不使用（温存）。※閾値は実写で要較正。
 - [ ] 検出失敗時のUX（撮り直し誘導）※フォールバック表示は実装済み
 - [ ] 基本4線の領域抽出 → 線トレース（OpenCV.js）
 - [ ] 特徴量の量子化（length/curve/depth/slope/start_height）

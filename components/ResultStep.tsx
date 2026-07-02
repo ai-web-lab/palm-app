@@ -15,13 +15,34 @@ import {
 } from "@/lib/diagnosis";
 import { detectHandLandmarks, normalizeImage } from "@/lib/handDetect";
 import { computeHandMetrics } from "@/lib/handMetrics";
-import { LINE_COLOR, LINE_ORDER, isExtra } from "@/lib/rules";
-import type { CapturedHand, Hand, LineKey, LineResult, Mode } from "@/lib/types";
+import { extractPalmLines } from "@/lib/lineExtraction";
+import { LINE_COLOR, LINE_ORDER, RULES, isExtra } from "@/lib/rules";
+import type {
+  CapturedHand,
+  Features,
+  Hand,
+  LineKey,
+  LineResult,
+  Mode,
+} from "@/lib/types";
 
 /**
- * 結果画面。診断は「特徴量の読み取り（A）」だけで決まる。
- * 写真への線オーバーレイ（B：なぞる／ドラッグ調整）は廃止した（docs/07）。
+ * 結果画面。診断は「特徴量の読み取り（A/B）」だけで決まる。
+ * A：手型・指（landmark実測）。B：基本4線の濃さ・presence・目立ち度（実測）。
+ * 写真への線オーバーレイ（なぞる／ドラッグ調整）は廃止した（docs/07）。
  */
+
+/** CVで濃さ/presenceを測る基本4線。 */
+const BASE4: LineKey[] = ["life_line", "head_line", "heart_line", "fate_line"];
+/** 実測を採用する目立ち度（confidence）のしきい値。テクスチャの誤検出を避けやや高め。 */
+const MEASURE_MIN = 0.5;
+
+/** 未測定の初期特徴量：基本4線は空(=standard)、extra3は absent（検出対象外を正直に）。 */
+function baselineFeatures(): Record<LineKey, Features> {
+  const f = {} as Record<LineKey, Features>;
+  for (const k of LINE_ORDER) f[k] = BASE4.includes(k) ? {} : { presence: "absent" };
+  return f;
+}
 
 interface Props {
   handedness: Hand;
@@ -47,16 +68,25 @@ export default function ResultStep({
   const main = primaryHand(mode, handedness);
   const mainHand = captured.find((h) => h.hand === main) || captured[0];
 
+  // 実測特徴量（B）。初期は未測定（standard/absent）。計測後に上書きされる。
+  const [effFeatures, setEffFeatures] = useState<Record<LineKey, Features>>(
+    baselineFeatures,
+  );
+  // いちばんはっきり出ている線（目立ち度ランキングの1位）。
+  const [prominent, setProminent] = useState<{ line: LineKey; name: string } | null>(
+    null,
+  );
+
   // 診断＝特徴量の読み取りから組み立てる（線の座標は使わない）。
   const { diag, summary, diff } = useMemo(() => {
-    const d = diagnoseHand(mainHand.features).filter((r) => !r.absent);
+    const d = diagnoseHand(effFeatures).filter((r) => !r.absent);
     return {
       diag: d,
       summary: overall(d),
       diff: mode === "both" ? diffText() : null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainHand.features, mode]);
+  }, [effFeatures, mode]);
 
   // 表示する線＝特記のある線（standard は出さない＝当たり障りない文で埋めない）。
   const shown: LineResult[] = useMemo(() => {
@@ -81,6 +111,8 @@ export default function ResultStep({
     setDisplayUrl(mainHand.image);
     setHandType(null);
     setFingerNotes([]);
+    setEffFeatures(baselineFeatures());
+    setProminent(null);
     (async () => {
       const norm = await normalizeImage(mainHand.image);
       if (cancelled || !norm) return;
@@ -88,9 +120,33 @@ export default function ResultStep({
       const lm = await detectHandLandmarks(norm.canvas);
       if (cancelled || !lm) return;
       const lmPx = lm.map((p) => ({ x: p.x * norm.width, y: p.y * norm.height }));
+
+      // A：手型・指
       const m = computeHandMetrics(lmPx);
       setHandType(readHandType(m));
       setFingerNotes(readFingers(m));
+
+      // B：基本4線の「濃さ(depth)・presence・目立ち度(confidence)」を実測。
+      //    位置・長さ・カーブ等の不安定な量は使わない（standardのまま＝断定しない）。
+      const cv = extractPalmLines(norm.canvas, lm);
+      if (cancelled) return;
+      const feats = baselineFeatures();
+      let best: { line: LineKey; conf: number } | null = null;
+      for (const k of BASE4) {
+        const conf = cv?.confidence[k] ?? 0;
+        if (conf >= MEASURE_MIN) {
+          const depth = cv?.features[k]?.depth;
+          if (depth) feats[k] = { ...feats[k], depth };
+          if (k === "fate_line") feats[k] = { ...feats[k], presence: "present" };
+          if (!best || conf > best.conf) best = { line: k, conf };
+        } else if (k === "fate_line") {
+          feats[k] = { presence: "absent" };
+        }
+      }
+      setEffFeatures(feats);
+      setProminent(
+        best ? { line: best.line, name: RULES.lines[best.line].name_ja } : null,
+      );
     })();
     return () => {
       cancelled = true;
@@ -129,6 +185,17 @@ export default function ResultStep({
               {handType.advice}
             </div>
           )}
+        </div>
+      )}
+
+      {/* いちばんはっきり出ている線（目立ち度の実測1位） */}
+      {prominent && (
+        <div className="prominent-line">
+          <span
+            className="pl-dot"
+            style={{ background: LINE_COLOR[prominent.line] }}
+          />
+          いちばんはっきり出ているのは〈{prominent.name}〉
         </div>
       )}
 
