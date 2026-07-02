@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "掌相 — 手相診断",
+  title: "てのひら手相 — 手相診断",
   description:
     "カメラ撮影または手の写真のアップロードで、手相の線を読み解くWebアプリ（娯楽目的）。",
 };

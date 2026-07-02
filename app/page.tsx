@@ -169,7 +169,7 @@ export default function Home() {
     <div className="wrap">
       <header className="top">
         <div className="brand">
-          掌相<small>PALM READING</small>
+          てのひら手相<small>PALM READING</small>
         </div>
         <div className="tagline">手のひらに、これからのヒントを。</div>
         <div className="proto-badge">β ・ 線検出は開発中</div>
